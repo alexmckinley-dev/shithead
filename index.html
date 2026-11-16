@@ -22,6 +22,9 @@ input{width:100%;font:inherit;padding:10px 12px;border-radius:10px;border:1px so
 .btn.primary{background:var(--accent);color:#2a2100;border-color:var(--accent)}
 .btn.wide{width:100%;margin-top:12px}
 .btn:disabled{opacity:.4;cursor:default}
+.games{display:flex;gap:6px;margin-bottom:10px}
+.games a{flex:1;text-align:center;padding:9px;border-radius:10px;border:1px solid var(--line);color:var(--ink);text-decoration:none;font-weight:600}
+.games a.on{background:var(--accent);color:#2a2100;border-color:var(--accent)}
 header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
 header b{font-size:1.2rem}
 header .sp{flex:1}
@@ -542,7 +545,8 @@ function renderStart(){
   const code = (params.get('room') || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0,4);
   const saved = ls.get('sh-host');
   const canResume = !code && saved && saved.G && saved.G.phase !== 'lobby' && Date.now() - saved.t < 12 * 3600e3;
-  $('#app').innerHTML = `<div class="panel">
+  $('#app').innerHTML = `<div class="games"><a class="on" href="./">Shithead</a><a href="kabuki.html">Kabuki</a></div>
+  <div class="panel">
     <h1>Shithead</h1><p class="muted">Kartenspiel für 2 bis 8 Leute, jeder am eigenen Handy. Einer erstellt den Raum, die anderen öffnen den Link.</p>
     <label for="name">Dein Name</label><input id="name" maxlength="16" autocomplete="nickname" value="${esc(myName())}">
     ${code ? `<button class="btn primary wide" data-act="join" data-code="${code}">Raum ${code} beitreten</button>`

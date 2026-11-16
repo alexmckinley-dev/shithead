@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f3d2e">
+<title>Kabuki</title>
+<style>
+:root{--bg:#0f3d2e;--felt:#165a43;--line:#2a7559;--ink:#f3f1e8;--muted:#a9c2b6;--card:#fffdf7;--red:#c0392b;--black:#1d1d1f;--accent:#f5c542;--ok:#7ee0a8;--bad:#e0675a;--joker:#6b3fa0}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+body{min-height:100vh;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+#app{max-width:760px;margin:0 auto;padding:12px 16px 40px}
+h1{margin:.2em 0;font-size:2.2rem;letter-spacing:.02em}
+.muted{color:var(--muted)}
+.panel{background:var(--felt);border:1px solid var(--line);border-radius:14px;padding:16px;margin:12px 0}
+label{display:block;margin:12px 0 6px;color:var(--muted);font-size:.9rem}
+input{width:100%;font:inherit;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0b2e22;color:var(--ink)}
+.row{display:flex;gap:8px;margin-top:10px}
+.row input{flex:1}
+.btn{font:inherit;font-weight:600;padding:11px 16px;border-radius:10px;border:1px solid var(--line);background:#0b2e22;color:var(--ink);cursor:pointer}
+.btn.primary{background:var(--accent);color:#2a2100;border-color:var(--accent)}
+.btn.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn.wide{width:100%;margin-top:12px}
+.btn:disabled{opacity:.4;cursor:default}
+.games{display:flex;gap:6px;margin-bottom:10px}
+.games a{flex:1;text-align:center;padding:9px;border-radius:10px;border:1px solid var(--line);color:var(--ink);text-decoration:none;font-weight:600}
+.games a.on{background:var(--accent);color:#2a2100;border-color:var(--accent)}
+header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+header b{font-size:1.2rem}
+header .sp{flex:1}
+.small-btn{font:inherit;font-size:.85rem;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:#0b2e22;color:var(--ink);cursor:pointer}
+#banner{display:none;background:var(--bad);color:#fff;text-align:center;padding:8px;font-weight:600}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#111c;color:#fff;padding:10px 16px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center;z-index:9}
+#toast.on{opacity:1}
+.code{font-size:2.4rem;font-weight:800;letter-spacing:.2em;color:var(--accent)}
+.plist{list-style:none;padding:0;margin:8px 0}
+.plist li{padding:6px 0;border-bottom:1px solid var(--line)}
+.opps{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.opp{background:var(--felt);border:2px solid var(--line);border-radius:12px;padding:8px}
+.opp.turn{border-color:var(--accent);box-shadow:0 0 0 2px #f5c54233}
+.opp .nm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.opp .cnt{font-size:.8rem;color:var(--muted)}
+.tag{font-size:.75rem;font-weight:600;color:var(--accent)}
+.grid{display:grid;grid-template-columns:repeat(2,max-content);gap:8px;margin-top:6px}
+.opp .grid{gap:5px}
+.center{display:flex;align-items:flex-start;justify-content:center;gap:22px;padding:18px 0 8px}
+.stack{text-align:center;font-size:.8rem;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:4px;min-width:64px}
+.log{font-size:.9rem;color:var(--muted);min-height:4.8em;text-align:center}
+.log div:last-child{color:var(--ink);font-weight:600}
+.mine{background:var(--felt);border:2px solid var(--line);border-radius:14px;padding:10px 12px;margin-top:10px;display:flex;flex-direction:column;align-items:center}
+.mine.myturn{border-color:var(--accent)}
+.zone-label{font-size:.8rem;color:var(--muted);margin:2px 0 4px;align-self:flex-start}
+.card{width:58px;height:84px;border-radius:7px;background:var(--card);color:var(--black);border:1px solid #0004;position:relative;display:inline-flex;align-items:center;justify-content:center;font:700 15px system-ui,sans-serif;box-shadow:0 1px 3px #0006;padding:0;flex:none;cursor:pointer;transition:transform .1s}
+.card .r{position:absolute;top:3px;left:5px}
+.card .s{font-size:28px;line-height:1}
+.card .v{position:absolute;bottom:2px;right:5px;font-size:11px;opacity:.7}
+.card.red{color:var(--red)}
+.card.joker{color:var(--joker)}
+.card.back{background:repeating-linear-gradient(45deg,#7a2430 0 6px,#8e2c39 6px 12px);border:3px solid #fffdf7}
+.card.empty{background:transparent;border:2px dashed var(--line);box-shadow:none;cursor:default}
+.card.sm{width:36px;height:52px;font-size:11px}
+.card.sm .s{font-size:17px}
+.card.sm .r{top:1px;left:3px}
+.card.sm .v{display:none}
+.card.ok{outline:2px solid var(--ok)}
+.card.peek{outline:3px solid var(--accent)}
+.card.pick{outline:3px solid var(--accent);transform:translateY(-6px)}
+.card:disabled{cursor:default}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center;position:sticky;bottom:0;background:var(--bg);padding:10px 0 calc(10px + env(safe-area-inset-bottom));z-index:5;border-top:1px solid var(--line)}
+.actions .btn{flex:1;min-width:130px}
+.hint{width:100%;color:var(--muted);font-size:.9rem}
+.big{font-size:1.15rem;font-weight:700;width:100%}
+.warn{width:100%;background:#f5c54222;border:1px solid var(--accent);border-radius:10px;padding:6px 10px;font-weight:600}
+table.res{width:100%;border-collapse:collapse;margin-top:8px}
+table.res td{padding:6px 4px;border-bottom:1px solid var(--line);vertical-align:middle}
+table.res .cards{display:flex;gap:3px;flex-wrap:wrap}
+details{margin-top:14px}
+summary{cursor:pointer;color:var(--muted)}
+details ul{padding-left:20px;margin:8px 0}
+details li{margin:4px 0}
+</style>
+<script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
+</head>
+<body>
+<div id="banner"></div>
+<div id="app"></div>
+<div id="toast"></div>
+<script>
+'use strict';
+// ---------- Grundlagen ----------
+const SUITS = ['♠','♥','♦','♣'];
+const RL = {0:'Jo',1:'A',11:'B',12:'D',13:'K'};
+const rl = r => RL[r] || String(r);
+const isRed = c => c.s === '♥' || c.s === '♦';
+const VAL = c => c.r === 0 ? 0 : c.r === 13 ? (isRed(c) ? -1 : 11) : c.r >= 10 ? 10 : c.r;
+const label = c => c.r === 0 ? 'Joker' : rl(c.r) + c.s;
+const POWER = {7:'own', 8:'own', 9:'opp', 10:'opp', 11:'blind', 12:'queen'};
+const POWER_TXT = {own:'eigene Karte anschauen', opp:'fremde Karte anschauen', blind:'blind tauschen', queen:'tauschen und anschauen'};
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const $ = s => document.querySelector(s);
+const ls = {get(k){try{return JSON.parse(localStorage.getItem(k))}catch{return null}}, set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
+const ss = {get(k){try{return sessionStorage.getItem(k)}catch{return null}}, set(k,v){try{sessionStorage.setItem(k,v)}catch{}}};
+const rid = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => 'ABCDEFGHJKLMNPQRSTUVWXYZ'[b % 24]).join('');
+const params = new URLSearchParams(location.search);
+let token = ss.get('kb-token'); if (!token) { token = rid(12); ss.set('kb-token', token); }
+
+let joinName = '';
+let role = null, roomCode = null, mq = null, G = null, V = null;
+let lastTurn = null, joinTimer = null, awaitingView = false, stopped = false;
+let armed = false, pick = null;          // Schnellreaktion scharf; gewählte eigene Karte bei Bube/Dame
+
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove('on'),2800); }
+function banner(msg){ const b=$('#banner'); b.textContent=msg; b.style.display=msg?'block':'none'; }
+function myName(){ return (ls.get('sh-name')||'').trim().slice(0,16); }
+function shareLink(){ return location.origin + location.pathname + '?room=' + roomCode; }
+
+// ---------- Spiellogik (läuft nur beim Gastgeber) ----------
+function newGame(){ return {phase:'lobby', players:[], deck:[], pile:[], turn:-1, log:[], round:0, drawn:null, power:null, react:null, giveBack:null, turns:0, ender:null, endReason:null, finalLeft:null}; }
+function mkPlayer(name, tok){ return {name, token:tok, slots:[], peeks:[], ready:false, connected:true, total:0, score:null}; }
+function log(msg){ G.log.push(msg); if (G.log.length > 30) G.log.shift(); }
+function shuffle(a){ for (let i=a.length-1;i>0;i--){ const j=crypto.getRandomValues(new Uint32Array(1))[0]%(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+const count = p => p.slots.filter(Boolean).length;
+
+function deal(){
+  G.players = G.players.filter((p,i) => i === 0 || p.connected);
+  const d = []; let id = 0;
+  for (const s of SUITS) for (let r=1;r<=13;r++) d.push({r,s,id:id++});
+  d.push({r:0,s:'★',id:id++}, {r:0,s:'★',id:id++});
+  G.deck = shuffle(d); G.pile = [G.deck.pop()];
+  G.players.forEach((p,i) => {
+    p.slots = G.deck.splice(0,4);
+    p.peeks = [{p:i, slot:2, id:p.slots[2].id}, {p:i, slot:3, id:p.slots[3].id}];
+    p.ready = false; p.score = null;
+  });
+  Object.assign(G, {phase:'peek', drawn:null, power:null, react:null, giveBack:null, turns:0, ender:null, endReason:null, finalLeft:null});
+  G.turn = G.round % G.players.length; G.round++;
+  log(`Runde ${G.round}. Merkt euch eure beiden unteren Karten.`);
+}
+function beginPlay(){
+  G.phase = 'play'; G.players.forEach(p => p.peeks = []);
+  log(`Los geht's. ${G.players[G.turn].name} fängt an.`);
+}
+function drawFromDeck(){
+  if (!G.deck.length && G.pile.length > 1){ const top = G.pile.pop(); G.deck = shuffle(G.pile); G.pile = [top]; log('Ablage neu gemischt.'); }
+  return G.deck.pop() || null;
+}
+function toPile(c){ G.pile.push(c); G.react = {rank:c.r}; }     // offen abgelegt: Schnellreaktion möglich
+function nextTurn(){
+  const n = G.players.length; let k = G.turn;
+  for (let c=0; c<n; c++){
+    k = (k+1) % n;
+    if (k === G.ender) continue;
+    if (G.finalLeft && !G.finalLeft.includes(k)) continue;
+    G.turn = k; return;
+  }
+}
+function endTurn(){
+  G.drawn = null; G.power = null; G.turns++;
+  if (G.finalLeft){ G.finalLeft = G.finalLeft.filter(k => k !== G.turn); if (!G.finalLeft.length) return reveal(); }
+  nextTurn();
+}
+function triggerEmpty(i){
+  if (G.ender != null) return;
+  G.ender = i; G.endReason = 'leer';
+  G.finalLeft = G.players.map((_,k) => k).filter(k => k !== i);
+  log(`${G.players[i].name} hat keine Karten mehr. Alle anderen haben noch einen Zug.`);
+}
+function autoGive(){
+  const gb = G.giveBack; if (!gb) return;
+  const p = G.players[gb.from], s = p.slots.findIndex(Boolean);
+  if (s >= 0){ G.players[gb.to].slots[gb.slot] = p.slots[s]; p.slots[s] = null; }
+  G.giveBack = null; log(`${p.name} gibt automatisch eine Karte ab.`);
+  if (!count(p)) triggerEmpty(gb.from);
+}
+function reveal(){
+  if (G.giveBack) autoGive();
+  G.phase = 'over'; G.drawn = null; G.power = null; G.react = null;
+  G.players.forEach(p => { p.score = p.slots.filter(Boolean).reduce((a,c) => a + VAL(c), 0); p.total += p.score; p.peeks = []; });
+  const min = Math.min(...G.players.map(p => p.score));
+  log(`Aufgedeckt. Rundensieg: ${G.players.filter(p => p.score === min).map(p => p.name).join(' und ')} mit ${min} Punkten.`);
+}
+function powerPossible(i, k){
+  const mine = count(G.players[i]) > 0, others = G.players.some((q,k2) => k2 !== i && count(q) > 0);
+  return k === 'own' ? mine : k === 'opp' ? others : mine && others;
+}
+
+function apply(i, m){
+  const p = G.players[i], n = G.players.length;
+  switch (m.type){
+    case 'start':
+      if (i !== 0) return 'Nur der Gastgeber teilt aus.';
+      if (G.phase !== 'lobby' && G.phase !== 'over') return;
+      if (G.players.filter((q,k) => k === 0 || q.connected).length < 2) return 'Mindestens zwei Spieler.';
+      deal(); return;
+    case 'ready':
+      if (G.phase !== 'peek' || p.ready) return;
+      p.ready = true; p.peeks = []; log(`${p.name} hat sich die Karten gemerkt.`);
+      if (G.players.every(q => q.ready)) beginPlay();
+      return;
+    case 'ack': p.peeks = []; return;
+    case 'skip': {
+      if (i !== 0) return;
+      if (G.phase === 'peek'){ G.players.forEach(q => { if (!q.connected) q.ready = true; }); if (G.players.every(q => q.ready)) beginPlay(); return; }
+      if (G.phase !== 'play') return;
+      if (G.giveBack && !G.players[G.giveBack.from].connected) return autoGive();
+      const t = G.players[G.turn];
+      if (!t.connected){ if (G.drawn) G.pile.push(G.drawn.card); log(`${t.name} wird übersprungen.`); endTurn(); }
+      return;
+    }
+  }
+  if (G.phase !== 'play') return 'Gerade nicht.';
+  if (m.type === 'react') return react(i, m);
+  if (m.type === 'give') return give(i, m);
+  if (G.turn !== i) return 'Du bist nicht dran.';
+  if (G.giveBack) return `${G.players[G.giveBack.from].name} gibt erst noch eine Karte ab.`;
+  switch (m.type){
+    case 'draw': {
+      if (G.drawn || G.power) return;
+      const c = drawFromDeck(); if (!c) return 'Keine Karten mehr im Stapel.';
+      G.drawn = {card:c, from:'deck'}; G.react = null;
+      log(`${p.name} zieht vom Stapel.`); return;
+    }
+    case 'take': {
+      if (G.drawn || G.power) return;
+      if (!G.pile.length) return 'Die Ablage ist leer.';
+      if (!count(p)) return 'Du hast keine Karte zum Tauschen.';
+      const c = G.pile.pop(); G.drawn = {card:c, from:'pile'}; G.react = null;
+      log(`${p.name} nimmt ${label(c)} von der Ablage.`); return;
+    }
+    case 'swap': {
+      if (!G.drawn) return;
+      const s = +m.slot, old = p.slots[s];
+      if (!old) return 'Da liegt keine Karte.';
+      p.slots[s] = G.drawn.card; toPile(old);
+      log(`${p.name} tauscht Platz ${s+1} und legt ${label(old)} ab.`);
+      endTurn(); return;
+    }
+    case 'discard': {
+      if (!G.drawn) return;
+      if (G.drawn.from !== 'deck') return 'Eine Karte von der Ablage musst du gegen eine eigene tauschen.';
+      const c = G.drawn.card; G.drawn = null; toPile(c);
+      log(`${p.name} legt ${label(c)} ab.`);
+      const k = POWER[c.r];
+      if (k && powerPossible(i, k)){ G.power = {kind:k}; return; }
+      endTurn(); return;
+    }
+    case 'power': return usePower(i, m);
+    case 'nopower':
+      if (!G.power) return;
+      log(`${p.name} verzichtet auf die Sonderfunktion.`); endTurn(); return;
+    case 'kabuki':
+      if (G.drawn || G.power) return;
+      if (G.ender != null) return 'Die Runde endet schon.';
+      if (G.turns < n) return 'Kabuki geht erst ab der zweiten Spielrunde.';
+      G.ender = i; G.endReason = 'kabuki';
+      G.finalLeft = G.players.map((_,k) => k).filter(k => k !== i);
+      log(`${p.name} sagt Kabuki! Alle anderen haben noch einen Zug.`);
+      endTurn(); return;
+  }
+  return 'Unbekannte Aktion.';
+}
+function usePower(i, m){
+  const p = G.players[i], k = G.power && G.power.kind; if (!k) return;
+  const own = +m.own, mine = p.slots[own];
+  if (k === 'own'){
+    if (!mine) return 'Wähle eine deiner Karten.';
+    p.peeks = [{p:i, slot:own, id:mine.id}];
+    log(`${p.name} schaut sich Platz ${own+1} an.`); endTurn(); return;
+  }
+  const q = +m.p, s = +m.slot, t = G.players[q];
+  if (!t || q === i) return 'Wähle eine Karte eines Mitspielers.';
+  const theirs = t.slots[s]; if (!theirs) return 'Da liegt keine Karte.';
+  if (k === 'opp'){
+    p.peeks = [{p:q, slot:s, id:theirs.id}];
+    log(`${p.name} schaut sich Platz ${s+1} von ${t.name} an.`); endTurn(); return;
+  }
+  if (!mine) return 'Wähle zuerst eine deiner Karten.';
+  p.slots[own] = theirs; t.slots[s] = mine;
+  if (k === 'queen') p.peeks = [{p:i, slot:own, id:theirs.id}];
+  log(`${p.name} tauscht Platz ${own+1} mit Platz ${s+1} von ${t.name}${k === 'queen' ? ' und schaut die neue Karte an' : ' (blind)'}.`);
+  endTurn();
+}
+function react(i, m){
+  const p = G.players[i];
+  if (!G.react) return 'Gerade gibt es nichts abzuwerfen.';
+  if (G.giveBack) return 'Erst muss eine Karte zurückgegeben werden.';
+  const q = +m.p, s = +m.slot, t = G.players[q], c = t && t.slots[s];
+  if (!c) return 'Da liegt keine Karte.';
+  if (q !== i && !count(p)) return 'Du hast keine Karte, die du zurückgeben könntest.';
+  if (c.r === G.react.rank){
+    t.slots[s] = null; G.pile.push(c); G.react = null;   // keine Kettenreaktion
+    if (q === i){ log(`${p.name} wirft ${label(c)} ab.`); if (!count(p)) triggerEmpty(i); }
+    else { log(`${p.name} wirft ${label(c)} von ${t.name} ab und gibt eine Karte zurück.`); G.giveBack = {from:i, to:q, slot:s}; }
+    return;
+  }
+  const pen = drawFromDeck();
+  if (pen){ const e = p.slots.indexOf(null); if (e >= 0) p.slots[e] = pen; else p.slots.push(pen); }
+  log(`${p.name} liegt daneben: ${label(c)}${q !== i ? ' von ' + t.name : ''} passt nicht. Strafkarte.`);
+}
+function give(i, m){
+  const gb = G.giveBack, p = G.players[i];
+  if (!gb || gb.from !== i) return;
+  const s = +m.slot, c = p.slots[s]; if (!c) return 'Wähle eine deiner Karten.';
+  G.players[gb.to].slots[gb.slot] = c; p.slots[s] = null; G.giveBack = null;
+  log(`${p.name} gibt ${G.players[gb.to].name} eine Karte.`);
+  if (!count(p)) triggerEmpty(i);
+}
+
+function view(i){
+  const me = G.players[i];
+  const peeks = (me.peeks || []).map(x => { const c = G.players[x.p] && G.players[x.p].slots[x.slot]; return c && c.id === x.id ? {p:x.p, slot:x.slot, card:c} : null; }).filter(Boolean);
+  return {
+    phase:G.phase, me:i, code:roomCode, turn:G.turn, log:G.log.slice(-4), round:G.round,
+    players:G.players.map(p => ({name:p.name, slots:p.slots.map(c => c ? 1 : 0), connected:p.connected, ready:p.ready, total:p.total, score:p.score, cards:G.phase === 'over' ? p.slots : null})),
+    drawn: G.turn === i && G.drawn ? G.drawn : null,
+    drawing: G.drawn ? G.drawn.from : null, drawnPublic: G.drawn && G.drawn.from === 'pile' ? G.drawn.card : null,
+    top:G.pile[G.pile.length-1] || null, pileCount:G.pile.length, deck:G.deck.length,
+    power:G.power ? G.power.kind : null, react:G.react, giveBack:G.giveBack, peeks,
+    canKabuki: G.turns >= G.players.length && G.ender == null,
+    ender:G.ender, endReason:G.endReason, finalLeft:G.finalLeft
+  };
+}
+function broadcast(){
+  G.players.forEach((p,i) => {
+    if (i === 0){ V = view(0); render(); return; }
+    pub('p/' + p.token, {type:'view', view:view(i)});
+  });
+  ls.set('kb-host', {code:roomCode, G, t:Date.now()});
+}
+function tell(i, msg){
+  if (i === 0) return toast(msg);
+  pub('p/' + G.players[i].token, {type:'error', msg});
+}
+function act(i, m){ const err = apply(i, m); if (err) tell(i, err); broadcast(); }
+
+// ---------- Netzwerk (wie Shithead: öffentlicher MQTT-Server) ----------
+const BROKER = 'wss://broker.hivemq.com:8884/mqtt';
+const TOPIC = 'kabuki-gx7/';
+const T = sub => TOPIC + roomCode + '/' + sub;
+function pub(sub, obj){ if (mq && mq.connected) mq.publish(T(sub), JSON.stringify(obj), {qos:1}); }
+function mqConnect(will, onConnect, onMsg){
+  mq = mqtt.connect(BROKER, {clientId:'kb_' + rid(12), keepalive:15, reconnectPeriod:2000, connectTimeout:10000, clean:true, will});
+  mq.on('connect', () => { banner(''); onConnect(); });
+  mq.on('reconnect', () => { if (!stopped) banner('Verbindung weg, verbinde neu …'); });
+  mq.on('offline', () => { if (!stopped) banner('Keine Verbindung, verbinde neu …'); });
+  mq.on('message', (topic, buf) => { let m; try { m = JSON.parse(buf.toString()); } catch { return; } if (m && typeof m === 'object') onMsg(topic, m); });
+}
+function startHost(code, saved){
+  role = 'host'; roomCode = code; G = saved || newGame();
+  if (!saved) G.players.push(mkPlayer(myName(), token));
+  else { G.players.forEach((p,i) => p.connected = i === 0); G.players[0].token = token; }
+  $('#app').innerHTML = '<div class="panel">Erstelle Raum …</div>';
+  mqConnect({topic:T('all'), payload:JSON.stringify({type:'hostgone'}), qos:1, retain:false},
+    () => mq.subscribe(T('h'), {qos:1}, () => { pub('all', {type:'hostback'}); broadcast(); }),
+    (topic, m) => onHostData(m));
+}
+function onHostData(m){
+  const tok = typeof m.from === 'string' ? m.from : null; if (!tok) return;
+  if (m.type === 'join'){
+    const name = String(m.name || '').trim().slice(0,16) || 'Gast';
+    let i = G.players.findIndex((p,k) => k > 0 && p.token === tok);
+    if (i < 0 && G.phase !== 'lobby') i = G.players.findIndex((p,k) => k > 0 && !p.connected && p.name.toLowerCase() === name.toLowerCase());
+    if (i < 0){
+      if (G.phase !== 'lobby') return pub('p/' + tok, {type:'fatal', msg:'Hier läuft gerade eine Runde. Steig ein, wenn die nächste beginnt: Seite dann neu laden.'});
+      if (G.players.length >= 8) return pub('p/' + tok, {type:'fatal', msg:'Der Tisch ist voll (8 Leute).'});
+      G.players.push(mkPlayer(name, tok)); log(`${name} ist da.`);
+    } else {
+      const p = G.players[i];
+      if (!p.connected) log(`${p.name} ist wieder da.`);
+      p.token = tok; p.connected = true;
+    }
+    broadcast(); return;
+  }
+  const i = G.players.findIndex((p,k) => k > 0 && p.token === tok);
+  if (i < 0) return;
+  const p = G.players[i];
+  if (m.type === 'bye'){
+    if (G.phase === 'lobby'){ G.players.splice(i, 1); log(`${p.name} ist gegangen.`); }
+    else if (p.connected){ p.connected = false; log(`${p.name} hat die Verbindung verloren.`); }
+    broadcast(); return;
+  }
+  if (!p.connected){ p.connected = true; log(`${p.name} ist wieder da.`); }
+  act(i, m);
+}
+function startClient(code){
+  joinName = myName(); role = 'client'; roomCode = code.toUpperCase();
+  $('#app').innerHTML = `<div class="panel">Verbinde mit Raum ${esc(roomCode)} …</div>`;
+  mqConnect({topic:T('h'), payload:JSON.stringify({type:'bye', from:token}), qos:1, retain:false},
+    () => mq.subscribe([T('p/' + token), T('all')], {qos:1}, () => sendJoin()),
+    (topic, m) => {
+      if (stopped) return;
+      if (topic === T('all')){
+        if (m.type === 'hostgone') banner('Der Gastgeber ist gerade weg. Sobald er zurück ist, geht es weiter.');
+        else if (m.type === 'hostback'){ banner(''); sendJoin(); }
+        return;
+      }
+      if (m.type === 'view'){ awaitingView = false; banner(''); V = m.view; render(); }
+      else if (m.type === 'error') toast(m.msg);
+      else if (m.type === 'fatal'){ stopped = true; clearTimeout(joinTimer); mq.end(); banner(''); $('#app').innerHTML = `<div class="panel"><b>${esc(m.msg)}</b></div>`; }
+    });
+}
+function sendJoin(){
+  if (stopped) return;
+  awaitingView = true;
+  pub('h', {type:'join', name:joinName, from:token});
+  clearTimeout(joinTimer);
+  joinTimer = setTimeout(() => {
+    if (!awaitingView || stopped) return;
+    if (!V) $('#app').innerHTML = `<div class="panel"><b>Raum ${esc(roomCode)} antwortet nicht.</b><p class="muted">Ich versuche es weiter. Läuft das Spiel beim Gastgeber, und ist der Code richtig?</p><a class="btn wide" href="${esc(location.pathname)}">Zurück</a></div>`;
+    else banner('Der Gastgeber antwortet nicht, versuche weiter …');
+    sendJoin();
+  }, 6000);
+}
+function send(m){
+  if (role === 'host') return act(0, m);
+  if (mq && mq.connected) pub('h', {...m, from:token}); else toast('Nicht verbunden.');
+}
+window.addEventListener('pagehide', () => { if (role === 'client') pub('h', {type:'bye', from:token}); });
+
+// ---------- Oberfläche ----------
+const RULES = `<details><summary>Spielregeln</summary><ul>
+<li><b>Ziel:</b> am Ende einer Runde möglichst wenige Punkte vor sich liegen haben.</li>
+<li><b>Werte:</b> roter König −1, Joker 0, Ass 1, 2 bis 10 nach Zahl, Bube und Dame 10, schwarzer König 11.</li>
+<li><b>Start:</b> 4 verdeckte Karten im Quadrat. Die beiden unteren darfst du einmal anschauen, dann musst du sie dir merken.</li>
+<li><b>Dein Zug:</b> entweder vom Stapel ziehen und die Karte gegen eine eigene tauschen oder offen ablegen, oder die oberste offene Karte nehmen und gegen eine eigene tauschen. Die ersetzte Karte kommt offen auf die Ablage.</li>
+<li><b>Sonderkarten</b> (nur wenn vom Stapel gezogen und direkt abgelegt): 7 und 8 eigene Karte anschauen, 9 und 10 fremde Karte anschauen, Bube eigene mit fremder Karte blind tauschen, Dame tauschen und die erhaltene Karte anschauen.</li>
+<li><b>Schnell abwerfen:</b> Sobald eine Karte offen abgelegt wird, darf jeder eine Karte mit gleichem Wert (gleicher Rang) darauf werfen, auch außer der Reihe. Eigene Karte: du hast eine weniger. Fremde Karte: du gibst dem anderen danach eine deiner Karten. Nur die erste Reaktion zählt, keine Kette. Liegst du daneben, bleibt die Karte liegen und du bekommst eine Strafkarte.</li>
+<li><b>Kabuki:</b> ab der zweiten Spielrunde statt deines Zuges ansagen. Alle anderen haben noch einen Zug, dann wird aufgedeckt.</li>
+<li>Hat jemand keine Karten mehr, haben die anderen ebenfalls noch einen Zug.</li>
+<li>Die niedrigste Summe gewinnt die Runde. Die Punkte werden über die Runden zusammengezählt.</li></ul></details>`;
+
+function cardHTML(c, o = {}){
+  const cls = ['card', c.r === 0 ? 'joker' : isRed(c) ? 'red' : '', o.sm ? 'sm' : '', o.extra || ''].join(' ');
+  const attr = o.click ? `data-act="slot" data-p="${o.click.p}" data-s="${o.click.s}"` : o.act ? `data-act="${o.act}"` : 'disabled';
+  return `<button class="${cls}" ${attr} aria-label="${label(c)}"><span class="r">${rl(c.r)}</span><span class="s">${c.s}</span><span class="v">${VAL(c)}</span></button>`;
+}
+function header(){
+  return `<header><b>Kabuki</b><span class="muted">Raum ${esc(V.code)}</span><span class="sp"></span><button class="small-btn" data-act="share">Link teilen</button></header>`;
+}
+function render(){
+  if (!V) return renderStart();
+  const myTurn = V.phase === 'play' && V.turn === V.me;
+  if (myTurn && lastTurn !== true){ try { navigator.vibrate && navigator.vibrate(120); } catch {} }
+  lastTurn = myTurn;
+  document.title = myTurn ? '▶ Du bist dran – Kabuki' : 'Kabuki';
+  if (!V.react || V.giveBack) armed = false;
+  if (!(myTurn && (V.power === 'blind' || V.power === 'queen'))) pick = null;
+  $('#app').innerHTML = header() + (V.phase === 'lobby' ? lobbyHTML() : gameHTML(myTurn));
+}
+function lobbyHTML(){
+  const host = V.me === 0;
+  return `<div class="panel" style="text-align:center">
+    <div class="muted">Raumcode</div><div class="code">${esc(V.code)}</div>
+    <p class="muted">Schick den Link an deine Leute. Wer ihn öffnet, sitzt mit am Tisch.</p>
+    <button class="btn wide" data-act="share">Link teilen oder kopieren</button></div>
+  <div class="panel"><b>Am Tisch (${V.players.length}/8)</b>
+    <ul class="plist">${V.players.map((p,k) => `<li>${esc(p.name)}${k === 0 ? ' <span class="muted">(Gastgeber)</span>' : ''}${k === V.me ? ' <span class="tag">du</span>' : ''}</li>`).join('')}</ul>
+    ${host ? `<button class="btn primary wide" data-act="start" ${V.players.length < 2 ? 'disabled' : ''}>Austeilen</button>${V.players.length < 2 ? '<p class="muted">Warte auf mindestens einen Mitspieler.</p>' : ''}`
+           : '<p class="muted">Warte, bis der Gastgeber austeilt.</p>'}
+    ${RULES}</div>`;
+}
+
+function gameHTML(myTurn){
+  const me = V.players[V.me], n = V.players.length, host = V.me === 0;
+  const gb = V.giveBack && V.giveBack.from === V.me;
+  const clickable = q => {
+    if (V.phase !== 'play') return false;
+    if (gb) return q === V.me;
+    if (V.giveBack) return false;
+    if (armed) return true;
+    if (myTurn && V.drawn) return q === V.me;
+    if (myTurn && V.power){
+      if (V.power === 'own') return q === V.me;
+      if (V.power === 'opp') return q !== V.me;
+      return q === V.me || pick != null;
+    }
+    return false;
+  };
+  const slotHTML = (q, s, sm) => {
+    const pl = V.players[q];
+    if (V.phase === 'over'){ const c = pl.cards[s]; return c ? cardHTML(c, {sm}) : `<div class="card empty${sm ? ' sm' : ''}"></div>`; }
+    if (!pl.slots[s]) return `<div class="card empty${sm ? ' sm' : ''}"></div>`;
+    const click = clickable(q) ? {p:q, s} : null, picked = q === V.me && pick === s;
+    const pk = V.peeks.find(x => x.p === q && x.slot === s);
+    if (pk) return cardHTML(pk.card, {sm, click, extra:'peek' + (picked ? ' pick' : '')});
+    return `<button class="card back${sm ? ' sm' : ''}${click ? ' ok' : ''}${picked ? ' pick' : ''}" ${click ? `data-act="slot" data-p="${q}" data-s="${s}"` : 'disabled'} aria-label="verdeckte Karte"></button>`;
+  };
+  const grid = (q, sm) => `<div class="grid">${V.players[q].slots.map((_, s) => slotHTML(q, s, sm)).join('')}</div>`;
+
+  let opps = '';
+  for (let k = 1; k < n; k++){
+    const q = (V.me + k) % n, p = V.players[q];
+    const turn = V.phase === 'play' && V.turn === q;
+    const st = !p.connected ? '<span class="tag" style="color:var(--bad)">offline</span>'
+      : V.phase === 'peek' && p.ready ? '<span class="tag">bereit</span>'
+      : V.ender === q ? `<span class="tag">${V.endReason === 'kabuki' ? 'Kabuki' : 'leer'}</span>`
+      : turn ? '<span class="tag">am Zug</span>' : '';
+    opps += `<div class="opp ${turn ? 'turn' : ''}"><div class="nm">${esc(p.name)} ${st}</div>
+      <div class="cnt">${p.slots.filter(Boolean).length} Karten · ${p.total} Pkt.</div>${grid(q, true)}</div>`;
+  }
+
+  const canDraw = myTurn && !V.drawn && !V.power && !V.giveBack;
+  const canTake = canDraw && V.top && me.slots.some(Boolean);
+  const deck = `<div class="stack">${V.deck ? `<button class="card back${canDraw ? ' ok' : ''}" ${canDraw ? 'data-act="draw"' : 'disabled'} aria-label="Stapel"></button>` : '<div class="card empty"></div>'}Stapel ${V.deck}</div>`;
+  const pile = `<div class="stack">${V.top ? cardHTML(V.top, {act: canTake ? 'take' : null, extra: canTake ? 'ok' : ''}) : '<div class="card empty"></div>'}Ablage${V.react ? ' · <span class="tag">abwerfen!</span>' : ''}</div>`;
+  let hand = '';
+  if (V.drawn) hand = `<div class="stack">${cardHTML(V.drawn.card, {extra:'peek'})}<span class="tag">deine Karte</span></div>`;
+  else if (V.drawing && V.phase === 'play'){
+    const who = esc(V.players[V.turn].name);
+    hand = `<div class="stack">${V.drawnPublic ? cardHTML(V.drawnPublic) : '<button class="card back" disabled></button>'}${who} hat gezogen</div>`;
+  }
+  const center = `<div class="center">${deck}${pile}${hand}</div><div class="log">${V.log.map(l => `<div>${esc(l)}</div>`).join('')}</div>`;
+
+  const mine = `<div class="mine ${myTurn ? 'myturn' : ''}"><div class="zone-label">Deine Karten · ${me.total} Pkt. gesamt</div>${grid(V.me, false)}</div>`;
+
+  let actions = '';
+  if (V.phase === 'peek'){
+    if (!me.ready) actions = `<div class="hint">Merk dir deine beiden unteren Karten. Danach sind sie wieder verdeckt.</div><button class="btn primary" data-act="ready">Gemerkt</button>`;
+    else actions = `<div class="hint">Warte auf die anderen …</div>`;
+    if (host && V.players.some(p => !p.connected && !p.ready)) actions += `<button class="btn" data-act="skip">Offline-Spieler als bereit setzen</button>`;
+  } else if (V.phase === 'play'){
+    if (V.ender != null){
+      const e = V.players[V.ender].name;
+      actions += `<div class="warn">Letzte Runde: ${esc(e)} ${V.endReason === 'kabuki' ? 'hat Kabuki gesagt' : 'hat keine Karten mehr'}.${V.ender === V.me ? '' : V.finalLeft && V.finalLeft.includes(V.me) ? ' Du hast noch einen Zug.' : ' Dein letzter Zug ist vorbei.'}</div>`;
+    }
+    if (gb) actions += `<div class="big">Gib ${esc(V.players[V.giveBack.to].name)} eine deiner Karten: tippe sie an.</div>`;
+    else if (V.giveBack) actions += `<div class="hint">${esc(V.players[V.giveBack.from].name)} gibt ${esc(V.players[V.giveBack.to].name)} eine Karte …</div>`;
+    else if (myTurn){
+      if (V.power){
+        const t = {own:'Tippe eine deiner Karten zum Anschauen.', opp:'Tippe eine Karte eines Mitspielers zum Anschauen.',
+          blind: pick == null ? 'Bube: Tippe zuerst deine Karte, dann die fremde. Getauscht wird blind.' : 'Jetzt die Karte des Mitspielers antippen.',
+          queen: pick == null ? 'Dame: Tippe zuerst deine Karte, dann die fremde. Die neue darfst du anschauen.' : 'Jetzt die Karte des Mitspielers antippen.'}[V.power];
+        actions += `<div class="big">${POWER_TXT[V.power][0].toUpperCase() + POWER_TXT[V.power].slice(1)}</div><div class="hint">${t}</div><button class="btn" data-act="nopower">Verzichten</button>`;
+      } else if (V.drawn){
+        const k = POWER[V.drawn.card.r];
+        actions += V.drawn.from === 'deck'
+          ? `<div class="hint">Tippe eine deiner Karten zum Tauschen oder leg die gezogene Karte ab.</div><button class="btn primary" data-act="discard">Ablegen${k ? ': ' + POWER_TXT[k] : ''}</button>`
+          : `<div class="hint">Tippe die Karte, die du dafür ablegst.</div>`;
+      } else {
+        actions += `<div class="big">Du bist dran.</div><div class="hint">Zieh vom Stapel oder nimm die offene Karte von der Ablage.</div>`;
+        if (V.canKabuki) actions += `<button class="btn danger" data-act="kabuki">Kabuki!</button>`;
+      }
+    } else {
+      const t = V.players[V.turn];
+      actions += `<div class="hint">${esc(t.name)} ist dran${V.power ? ': ' + POWER_TXT[V.power] : ''}.</div>`;
+      if (host && !t.connected) actions += `<button class="btn" data-act="skip">${esc(t.name)} überspringen</button>`;
+      if (host && V.giveBack && !V.players[V.giveBack.from].connected) actions += `<button class="btn" data-act="skip">Für ${esc(V.players[V.giveBack.from].name)} abgeben</button>`;
+    }
+    if (V.react && !V.giveBack){
+      actions += armed
+        ? `<div class="hint">Tippe die Karte, die du abwerfen willst: eine eigene oder eine fremde ${rl(V.react.rank)}.</div><button class="btn" data-act="arm">Abbrechen</button>`
+        : `<button class="btn" data-act="arm">Schnell abwerfen (${rl(V.react.rank)})</button>`;
+    }
+    if (V.peeks.length) actions += `<button class="btn" data-act="ack">Gemerkt, umdrehen</button>`;
+  } else if (V.phase === 'over'){
+    const min = Math.min(...V.players.map(p => p.score));
+    const rows = V.players.map(p => `<tr><td><b>${esc(p.name)}</b>${p.score === min ? ' <span class="tag">Sieg</span>' : ''}</td>
+      <td><div class="cards">${p.cards.filter(Boolean).map(c => cardHTML(c, {sm:true})).join('') || '<span class="muted">keine</span>'}</div></td>
+      <td style="text-align:right"><b>${p.score}</b><div class="muted" style="font-size:.8rem">ges. ${p.total}</div></td></tr>`).join('');
+    actions = `<div class="panel" style="width:100%"><div class="big">Runde ${V.round} vorbei</div><table class="res">${rows}</table>
+      ${host ? '<button class="btn primary wide" data-act="start">Neue Runde</button>' : '<p class="muted">Warte auf den Gastgeber für die nächste Runde.</p>'}</div>`;
+  }
+  return `<div class="opps">${opps}</div>${center}${mine}<div class="actions">${actions}</div>${RULES}`;
+}
+
+function renderStart(){
+  const code = (params.get('room') || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0,4);
+  const saved = ls.get('kb-host');
+  const canResume = !code && saved && saved.G && saved.G.phase !== 'lobby' && Date.now() - saved.t < 12 * 3600e3;
+  $('#app').innerHTML = `<div class="games"><a href="./">Shithead</a><a class="on" href="kabuki.html">Kabuki</a></div>
+  <div class="panel">
+    <h1>Kabuki</h1><p class="muted">Merkspiel für 2 bis 8 Leute, jeder am eigenen Handy. Wenige Punkte gewinnen. Einer erstellt den Raum, die anderen öffnen den Link.</p>
+    <label for="name">Dein Name</label><input id="name" maxlength="16" autocomplete="nickname" value="${esc(myName())}">
+    ${code ? `<button class="btn primary wide" data-act="join" data-code="${code}">Raum ${code} beitreten</button>`
+      : `<button class="btn primary wide" data-act="host">Neues Spiel erstellen</button>
+         <div class="row"><input id="code" placeholder="Raumcode" maxlength="4" autocapitalize="characters"><button class="btn" data-act="joincode">Beitreten</button></div>`}
+    ${canResume ? `<button class="btn wide" data-act="resume">Mein Spiel ${esc(saved.code)} fortsetzen</button>` : ''}
+    ${RULES}</div>`;
+}
+function takeName(){
+  const v = ($('#name')?.value || '').trim().slice(0,16);
+  if (!v){ toast('Gib erst deinen Namen ein.'); $('#name')?.focus(); return false; }
+  ls.set('sh-name', v); return true;
+}
+
+const handlers = {
+  host(){ if (takeName()) startHost(rid(4)); },
+  join(t){ if (takeName()) startClient(t.dataset.code); },
+  joincode(){
+    const c = ($('#code').value || '').toUpperCase().replace(/[^A-Z]/g, '');
+    if (c.length !== 4) return toast('Der Raumcode hat vier Buchstaben.');
+    if (!takeName()) return;
+    history.replaceState(null, '', '?room=' + c); startClient(c);
+  },
+  resume(){ if (!takeName()) return; const s = ls.get('kb-host'); s.G.players[0].name = myName(); startHost(s.code, s.G); },
+  async share(){
+    const url = shareLink();
+    if (navigator.share){ try { await navigator.share({title:'Kabuki', text:`Komm an den Tisch, Raum ${roomCode}`, url}); return; } catch {} }
+    try { await navigator.clipboard.writeText(url); toast('Link kopiert.'); } catch { prompt('Link kopieren:', url); }
+  },
+  start(){ send({type:'start'}); },
+  ready(){ send({type:'ready'}); },
+  ack(){ send({type:'ack'}); },
+  skip(){ send({type:'skip'}); },
+  draw(){ send({type:'draw'}); },
+  take(){ send({type:'take'}); },
+  discard(){ send({type:'discard'}); },
+  nopower(){ pick = null; send({type:'nopower'}); },
+  kabuki(){ if (confirm('Kabuki ansagen? Alle anderen haben dann noch einen Zug.')) send({type:'kabuki'}); },
+  arm(){ armed = !armed; render(); },
+  slot(t){
+    const q = +t.dataset.p, s = +t.dataset.s;
+    if (V.giveBack && V.giveBack.from === V.me) return send({type:'give', slot:s});
+    if (armed){ armed = false; return send({type:'react', p:q, slot:s}); }
+    if (V.drawn) return send({type:'swap', slot:s});
+    if (V.power === 'own') return send({type:'power', own:s});
+    if (V.power === 'opp') return send({type:'power', p:q, slot:s});
+    if (V.power){
+      if (q === V.me){ pick = pick === s ? null : s; return render(); }
+      if (pick == null) return toast('Tippe zuerst eine deiner Karten.');
+      const own = pick; pick = null; return send({type:'power', own, p:q, slot:s});
+    }
+  }
+};
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act]'); if (!t || t.disabled) return;
+  handlers[t.dataset.act]?.(t);
+});
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && !V && e.target.id === 'code') handlers.joincode(); });
+if (typeof mqtt === 'undefined') { document.body.innerHTML = '<p style="padding:16px">Die Verbindungsbibliothek konnte nicht geladen werden. Internetverbindung prüfen und neu laden.</p>'; }
+else renderStart();
+</script>
+</body>
+</html>
