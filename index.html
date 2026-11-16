@@ -181,6 +181,10 @@ function putOnPile(i, cards, note){
   log(msg);
   G.turn = i;
   if (!burn && r === 3){
+    // Die gespielte 3 wird verbrannt, nur der Rest des Stapels wandert weiter (sonst Endlosschleife).
+    G.pile.splice(G.pile.length - cards.length); G.burned += cards.length;
+    log(`Die 3 ist verbrannt.`);
+    if (!G.pile.length){ log('Der Stapel ist leer, nichts zu verteilen.'); checkOut(i); nextTurn(); return; }
     const cand = G.players.map((q,k) => k).filter(k => k !== i && !G.players[k].out);
     if (cand.length === 1) return giveTo(i, cand[0]);
     G.give = i; return;
@@ -398,7 +402,7 @@ const RULES = `<details><summary>Spielregeln</summary><ul>
 <li>Wer dran ist, legt eine oder mehrere gleiche Karten, mindestens so hoch wie die oberste. Ass ist hoch. Danach auf 3 Handkarten nachziehen, solange der Talon reicht.</li>
 <li><b>2, 3, 8 und 10</b> gehen immer. Ausnahme: die 10 nie auf eine 7.</li>
 <li><b>2</b> setzt zurück auf 2: danach geht alles.</li>
-<li><b>3</b>: du gibst den ganzen Stapel einem Mitspieler deiner Wahl.</li>
+<li><b>3</b>: die 3 wird verbrannt, den restlichen Stapel gibst du einem Mitspieler deiner Wahl.</li>
 <li><b>7</b>: der Nächste muss drunter (7 oder kleiner, oder 2, 3, 8). Die 7 selbst ist keine Joker-Karte, sie geht nicht auf Bube und höher.</li>
 <li><b>8</b> ist durchsichtig: es gilt die Karte darunter.</li>
 <li><b>10</b> verbrennt den Stapel. Vier gleiche Karten hintereinander verbrennen ihn auch. Wer verbrennt, legt nochmal.</li>
