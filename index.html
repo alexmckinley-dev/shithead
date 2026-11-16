@@ -25,6 +25,16 @@ input{width:100%;font:inherit;padding:10px 12px;border-radius:10px;border:1px so
 .games{display:flex;gap:6px;margin-bottom:10px}
 .games a{flex:1;text-align:center;padding:9px;border-radius:10px;border:1px solid var(--line);color:var(--ink);text-decoration:none;font-weight:600}
 .games a.on{background:var(--accent);color:#2a2100;border-color:var(--accent)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font:inherit;font-weight:600;min-width:46px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:#0b2e22;color:var(--ink);cursor:pointer}
+.chip.on{background:var(--accent);color:#2a2100;border-color:var(--accent)}
+.botbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.limit{margin-top:12px}
+.limit input[type=range]{padding:0;border:0;background:none;accent-color:var(--accent);height:32px}
+.timer{position:relative;width:100%;height:28px;border-radius:8px;border:1px solid var(--line);background:#0b2e22;overflow:hidden}
+.timer i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);opacity:.4;transition:width .2s linear}
+.timer span{position:relative;display:block;text-align:center;font-weight:700;line-height:26px}
+.timer.low i{background:var(--bad);opacity:.7}
 header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
 header b{font-size:1.2rem}
 header .sp{flex:1}
@@ -104,7 +114,10 @@ const params = new URLSearchParams(location.search);
 let token = ss.get('sh-token'); if (!token) { token = rid(12); ss.set('sh-token', token); }
 
 let joinName = '';
-let role = null, roomCode = null, mq = null, G = null, V = null;
+let role = null, roomCode = null, mq = null, G = null, V = null, local = false;
+const soloCfg = ls.get('sh-solo') || {};
+let soloN = soloCfg.n || 3, soloLv = soloCfg.lv || 'uebel', soloT = soloCfg.t || 0;
+const saveSolo = () => ls.set('sh-solo', {n:soloN, lv:soloLv, t:soloT});
 let sel = new Set(), swapPick = null, lastTurn = null, joinTimer = null, awaitingView = false, stopped = false;
 
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove('on'),2600); }
@@ -114,8 +127,8 @@ function shareLink(){ return location.origin + location.pathname + '?room=' + ro
 
 // ---------- Spiellogik (läuft nur beim Gastgeber) ----------
 function newGame(){ return {phase:'lobby', players:[], deck:[], pile:[], burned:0, turn:-1, log:[], finish:[], loser:null, give:null}; }
-function mkPlayer(name, tok){ return {name, token:tok, hand:[], up:[], down:[], ready:false, out:false, connected:true}; }
-function log(msg){ G.log.push(msg); if (G.log.length > 30) G.log.shift(); }
+function mkPlayer(name, tok, bot){ return {name, token:tok, bot:bot || null, hand:[], up:[], down:[], ready:false, out:false, connected:true}; }
+function log(msg){ G.seq = (G.seq || 0) + 1; G.log.push(msg); if (G.log.length > 30) G.log.shift(); }
 function shuffle(a){ for (let i=a.length-1;i>0;i--){ const j=crypto.getRandomValues(new Uint32Array(1))[0]%(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 
 function deal(){
@@ -209,6 +222,16 @@ function beginPlay(){
 function apply(i, m){
   const p = G.players[i];
   switch (m.type){
+    case 'addbot':
+      if (i !== 0) return;
+      if (G.phase !== 'lobby' && G.phase !== 'over') return 'Bots kommen nur zwischen den Runden dazu.';
+      return addBot(m.level);
+    case 'kickbot':
+      if (i !== 0 || (G.phase !== 'lobby' && G.phase !== 'over')) return;
+      kickBot(+m.idx); return;
+    case 'limit':
+      if (i !== 0 || (G.phase !== 'lobby' && G.phase !== 'over')) return;
+      G.limit = setLimit(m.s); log(`Zeitlimit: ${limTxt(G.limit)}.`); return;
     case 'start':
       if (i !== 0) return 'Nur der Gastgeber startet.';
       if (G.phase !== 'lobby' && G.phase !== 'over') return;
@@ -288,23 +311,229 @@ function apply(i, m){
 function view(i){
   return {
     phase:G.phase, me:i, code:roomCode, turn:G.turn, log:G.log.slice(-3),
-    players:G.players.map((p,k) => ({name:p.name, hand:p.hand.length, up:p.up, down:p.down.length, out:p.out, ready:p.ready, connected:p.connected, place:G.finish.indexOf(k)})),
+    players:G.players.map((p,k) => ({name:p.name, bot:p.bot, hand:p.hand.length, up:p.up, down:p.down.length, out:p.out, ready:p.ready, connected:p.connected, place:G.finish.indexOf(k)})),
     hand:G.players[i].hand, pile:G.pile.slice(-4), pileCount:G.pile.length, eff:effTop(), run:topRun(), give:G.give, deck:G.deck.length, burned:G.burned, loser:G.loser,
-    finish:G.finish.map(k => G.players[k].name)
+    finish:G.finish.map(k => G.players[k].name),
+    limit:G.limit || 0, left:G.deadline ? Math.max(0, G.deadline - Date.now()) : null
   };
 }
 function broadcast(){
+  armTimer();
   G.players.forEach((p,i) => {
     if (i === 0){ V = view(0); render(); return; }
-    pub('p/' + p.token, {type:'view', view:view(i)});
+    if (!p.bot) pub('p/' + p.token, {type:'view', view:view(i)});
   });
-  ls.set('sh-host', {code:roomCode, G, t:Date.now()});
+  ls.set('sh-host', {code:roomCode, G, t:Date.now(), local});
+  scheduleBots();
 }
 function tell(i, msg){
   if (i === 0) return toast(msg);
-  pub('p/' + G.players[i].token, {type:'error', msg});
+  if (!G.players[i].bot) pub('p/' + G.players[i].token, {type:'error', msg});
 }
 function act(i, m){ const err = apply(i, m); if (err) tell(i, err); broadcast(); }
+
+// ---------- Bots: Spielweise Shithead ----------
+// Hart: legt die kleinste passende Karte, einzeln, manchmal planlos, tauscht vor dem Start nicht.
+// Übel: legt alle gleichen Karten, spart 2, 3, 8, 10 auf, gibt den Stapel an den Führenden, wirft Vierer rein.
+// Crazy: wie Übel, verbrennt große Stapel, verschenkt sie mit der 3, setzt die 7 gegen Knappe, reagiert am schnellsten.
+const STRONG = r => ({2:16, 3:15, 8:14, 10:17})[r] || r;
+const cardsLeft = q => q.hand.length + q.up.length + q.down.length;
+function nextActive(i){ const n = G.players.length; for (let k = 1; k < n; k++){ const j = (i + k) % n; if (!G.players[j].out) return j; } return i; }
+function bestSwap(p){
+  const lowUp = [...p.up].sort((a,b) => STRONG(a.r) - STRONG(b.r))[0];
+  const highHand = [...p.hand].sort((a,b) => STRONG(b.r) - STRONG(a.r))[0];
+  return lowUp && highHand && STRONG(highHand.r) > STRONG(lowUp.r) ? [highHand.id, lowUp.id] : null;
+}
+function giveTarget(i){
+  const opps = G.players.map((q,k) => k).filter(k => k !== i && !G.players[k].out);
+  if (G.players[i].bot === 'hart') return rnd(opps);
+  return opps.sort((a,b) => cardsLeft(G.players[a]) - cardsLeft(G.players[b]))[0];
+}
+function shMove(i){
+  const p = G.players[i], lv = p.bot, src = source(p);
+  if (src === 'down') return {type:'blind', idx: Math.floor(Math.random() * p.down.length)};
+  const arr = p[src], opts = [];
+  for (const r of new Set(arr.map(c => c.r))){
+    if (!canPlay(r)) continue;
+    let cards = arr.filter(c => c.r === r);
+    if (lv === 'hart') cards = cards.slice(0, 1);
+    if (endsWithTwo(p, src, cards)){ cards = cards.slice(0, -1); if (!cards.length) continue; }
+    opts.push({r, cards});
+  }
+  if (!opts.length) return G.pile.length ? {type:'pickup'} : {type:'play', ids:[arr[0].id]};
+  let normal = opts.filter(o => ![2,3,8,10].includes(o.r)).sort((a,b) => a.r - b.r);
+  if (!G.pile.length){
+    // Auf den leeren Stapel keine 7, sonst schieben sich Bots eine einzelne 7 endlos hin und her.
+    const no7 = normal.filter(o => o.r !== 7); if (no7.length) normal = no7;
+    if (Math.random() < 0.2 && normal.length) return {type:'play', ids: rnd(normal).cards.map(c => c.id)};
+  }
+  const spec = r => opts.find(o => o.r === r);
+  const pile = G.pile.length;
+  let pick = null;
+  if (lv === 'hart') pick = Math.random() < 0.25 ? rnd(opts) : (normal[0] || opts[0]);
+  else {
+    if (lv === 'crazy'){
+      const nx = G.players[nextActive(i)];
+      if (pile >= 6 && spec(10)) pick = spec(10);
+      else if (pile >= 5 && spec(3)) pick = spec(3);
+      else if (spec(7) && G.pile.length && cardsLeft(nx) <= 3 && effTop() !== 7) pick = spec(7);
+    }
+    if (!pick) pick = normal[0] || (pile >= 4 && spec(3)) || spec(8) || spec(2) || spec(3) || spec(10) || opts[0];
+  }
+  return {type:'play', ids: pick.cards.map(c => c.id)};
+}
+function botPlan(){
+  const P = G.players, c = [];
+  if (G.phase === 'swap'){
+    P.forEach((p,i) => {
+      if (!p.bot || p.ready) return;
+      const sw = p.bot !== 'hart' && bestSwap(p);
+      c.push(sw ? {i, m:{type:'swap', handId:sw[0], upId:sw[1]}, delay:350} : {i, m:{type:'ready'}, delay:800});
+    });
+  } else if (G.phase === 'play'){
+    if (G.give != null){ if (P[G.give].bot) c.push({i:G.give, m:{type:'give', to:giveTarget(G.give)}, delay:1000}); return c; }
+    const run = topRun();
+    if (run.n) P.forEach((p,i) => {
+      if (!p.bot || p.bot === 'hart' || p.out || i === G.turn) return;
+      const src = source(p); if (src !== 'hand' && src !== 'up') return;
+      const same = p[src].filter(x => x.r === run.r);
+      if (run.n + same.length < 4) return;
+      const cards = same.slice(0, 4 - run.n);
+      if (endsWithTwo(p, src, cards)) return;
+      c.push({i, m:{type:'throw', ids:cards.map(x => x.id)}, delay: p.bot === 'crazy' ? 700 : 1500});
+    });
+    if (P[G.turn] && P[G.turn].bot && !P[G.turn].out) c.push({i:G.turn, m:shMove(G.turn), delay:1100});
+  }
+  return c;
+}
+function botFallback(i){
+  if (G.phase === 'swap') return {type:'ready'};
+  if (G.phase !== 'play') return null;
+  if (G.give === i) return {type:'give', to:G.players.findIndex((q,k) => k !== i && !q.out)};
+  if (G.turn !== i) return null;
+  if (G.pile.length) return {type:'pickup'};
+  if (source(G.players[i]) === 'down') return {type:'blind', idx:0};
+  return null;
+}
+
+// ---------- Bots (gemeinsamer Rahmen) ----------
+// Bots sitzen beim Gastgeber und spielen über dieselbe apply()-Schnittstelle wie Menschen.
+const BOT_NAMES = ['Horst','Gisela','Rudi','Uschi','Klaus','Bärbel','Detlef','Inge','Waltraud','Kalle'];
+const LEVELS = {hart:'Hart', uebel:'Übel', crazy:'Crazy'};
+let botTimer = null;
+const botFails = new Set(), rolls = new Map();
+const roll = k => { if (!rolls.has(k)) rolls.set(k, Math.random()); return rolls.get(k); };
+const rnd = a => a[Math.floor(Math.random() * a.length)];
+function addBot(level){
+  if (!LEVELS[level]) return;
+  if (G.players.length >= 8) return 'Der Tisch ist voll (8 Leute).';
+  const used = new Set(G.players.map(p => p.name));
+  const name = BOT_NAMES.find(n => !used.has(n)) || 'Bot ' + G.players.length;
+  G.players.push(mkPlayer(name, 'bot-' + rid(8), level));
+  log(`${name} (Bot, ${LEVELS[level]}) setzt sich dazu.`);
+}
+function kickBot(k){
+  const p = G.players[k]; if (!p || !p.bot) return;
+  G.players.splice(k, 1); log(`${p.name} steht auf.`);
+  if (G.finish) G.finish = G.finish.filter(x => x !== k).map(x => x > k ? x - 1 : x);
+  if (G.loser != null) G.loser = G.loser === k ? null : G.loser > k ? G.loser - 1 : G.loser;
+}
+const failKey = (i, m) => (G.seq || 0) + '|' + i + '|' + JSON.stringify(m);
+function scheduleBots(){
+  clearTimeout(botTimer);
+  if (role !== 'host' || !G || !G.players.some(p => p.bot)) return;
+  const all = botPlan().filter(x => x && x.m && !botFails.has(failKey(x.i, x.m))).sort((a,b) => a.delay - b.delay);
+  const plan = all[0]; if (!plan) return;
+  botTimer = setTimeout(() => botAct(plan), plan.delay);
+}
+function botAct(plan){
+  const err = apply(plan.i, plan.m);
+  if (err){
+    console.warn('Bot-Zug abgelehnt:', G.players[plan.i] && G.players[plan.i].name, plan.m, err);
+    botFails.add(failKey(plan.i, plan.m));
+    const fb = botFallback(plan.i); if (fb) apply(plan.i, fb);
+  }
+  broadcast();
+}
+function startSolo(){
+  startHost('SOLO', null, true);
+  for (let k = 0; k < soloN; k++) addBot(soloLv);
+  G.limit = soloT; deal(); broadcast();
+}
+function botBar(){
+  const full = V.players.length >= 8;
+  return `<div class="botbar"><span class="muted">Bot dazu:</span>${Object.entries(LEVELS).map(([k,v]) => `<button class="small-btn" data-act="addbot" data-level="${k}" ${full ? 'disabled' : ''}>${v}</button>`).join('')}</div>`;
+}
+
+// ---------- Zeitlimit: Shithead ----------
+function timerKey(){
+  if (G.phase === 'swap') return G.players.some((q,k) => human(k) && !q.ready) ? 'swap' : null;
+  if (G.phase !== 'play') return null;
+  if (G.give != null) return human(G.give) ? 'give:' + G.give + ':' + G.seq : null;
+  return human(G.turn) && !G.players[G.turn].out ? 'turn:' + G.turn + ':' + G.seq : null;
+}
+function timeUp(){
+  if (G.phase === 'swap'){ G.players.forEach(q => q.ready = true); log('Zeit abgelaufen, es geht los.'); beginPlay(); return; }
+  if (G.phase !== 'play') return;
+  if (G.give != null){ const i = G.give; log(`${G.players[i].name}: Zeit abgelaufen.`); giveTo(i, nextActive(i)); return; }
+  const i = G.turn, p = G.players[i];
+  log(`${p.name}: Zeit abgelaufen.`);
+  if (G.pile.length){ apply(i, {type:'pickup'}); return; }           // liegt was, wird aufgenommen
+  const src = source(p);
+  if (src === 'down'){ apply(i, {type:'blind', idx:Math.floor(Math.random() * p.down.length)}); return; }
+  const arr = [...(p[src] || [])].sort((a,b) => STRONG(a.r) - STRONG(b.r));
+  for (const c of arr) if (!apply(i, {type:'play', ids:[c.id]})) return;   // sonst die schwächste Karte
+  nextTurn();
+}
+
+// ---------- Zeitlimit ----------
+// G.limit Sekunden pro Zug (0 = aus), nur Menschen. Der Gastgeber hält die Uhr; Mitspieler bekommen die Restzeit,
+// nicht die Uhrzeit, damit falsch gehende Handyuhren nichts ausmachen. Läuft sie ab, zieht timeUp() für den Spieler.
+let turnTimer = null;
+const human = i => G.players[i] && !G.players[i].bot;
+function armTimer(){
+  clearTimeout(turnTimer);
+  if (role !== 'host' || !G) return;
+  const k = G.limit ? timerKey() : null;
+  if (!k){ G.tkey = null; G.deadline = null; return; }
+  if (k !== G.tkey){ G.tkey = k; G.deadline = Date.now() + G.limit * 1000; }
+  turnTimer = setTimeout(onTimeout, Math.max(0, G.deadline - Date.now()) + 60);
+}
+function onTimeout(){
+  if (!G || !G.limit || !G.tkey || timerKey() !== G.tkey) return;
+  timeUp(); G.tkey = null; broadcast();
+}
+function setLimit(s){ s = Math.round(+s / 5) * 5; return Number.isFinite(s) ? Math.min(60, Math.max(0, s)) : 0; }
+const limTxt = s => s ? s + ' s pro Zug' : 'aus';
+function limitHTML(host, val, solo){
+  const v = val ?? (V ? V.limit : 0);
+  if (!host) return `<p class="muted" style="margin:10px 0 0">Zeitlimit: ${limTxt(v)}</p>`;
+  return `<div class="limit"><div class="zone-label">Zeitlimit <b data-limv>${limTxt(v)}</b></div>
+    <input type="range" min="0" max="60" step="5" value="${v}" data-limit="${solo ? 'solo' : 'room'}" aria-label="Zeitlimit in Sekunden"></div>`;
+}
+function timerHTML(){
+  if (!V || !V.limit || V.until == null) return '';
+  const ms = Math.max(0, V.until - Date.now());
+  return `<div class="timer${ms <= 5000 ? ' low' : ''}"><i style="width:${100 * ms / (V.limit * 1000)}%"></i><span>Zeit ${Math.ceil(ms / 1000)} s</span></div>`;
+}
+setInterval(() => {
+  if (!V || !V.limit || V.until == null) return;
+  const ms = Math.max(0, V.until - Date.now());
+  document.querySelectorAll('.timer').forEach(el => {
+    el.querySelector('i').style.width = (100 * ms / (V.limit * 1000)) + '%';
+    el.querySelector('span').textContent = 'Zeit ' + Math.ceil(ms / 1000) + ' s';
+    el.classList.toggle('low', ms <= 5000);
+  });
+}, 200);
+document.addEventListener('input', e => {
+  const t = e.target; if (!t.dataset || !t.dataset.limit) return;
+  const l = t.closest('.limit').querySelector('[data-limv]'); if (l) l.textContent = limTxt(setLimit(t.value));
+});
+document.addEventListener('change', e => {
+  const t = e.target; if (!t.dataset || !t.dataset.limit) return;
+  if (t.dataset.limit === 'solo'){ keepName(); soloT = setLimit(t.value); saveSolo(); }
+  else send({type:'limit', s:setLimit(t.value)});
+});
 
 // ---------- Netzwerk ----------
 // Alle Nachrichten laufen über einen öffentlichen MQTT-Server (verschlüsselter Websocket).
@@ -312,7 +541,7 @@ function act(i, m){ const err = apply(i, m); if (err) tell(i, err); broadcast();
 const BROKER = 'wss://broker.hivemq.com:8884/mqtt';
 const TOPIC = 'shithead-gx7/';
 const T = sub => TOPIC + roomCode + '/' + sub;
-function pub(sub, obj){ if (mq && mq.connected) mq.publish(T(sub), JSON.stringify(obj), {qos:1}); }
+function pub(sub, obj){ if (local) return; if (mq && mq.connected) mq.publish(T(sub), JSON.stringify(obj), {qos:1}); }
 function mqConnect(will, onConnect, onMsg){
   mq = mqtt.connect(BROKER, {clientId:'sh_' + rid(12), keepalive:15, reconnectPeriod:2000, connectTimeout:10000, clean:true, will});
   mq.on('connect', () => { banner(''); onConnect(); });
@@ -322,10 +551,11 @@ function mqConnect(will, onConnect, onMsg){
 }
 
 // Gastgeber
-function startHost(code, saved){
-  role = 'host'; roomCode = code; G = saved || newGame();
-  if (!saved) G.players.push(mkPlayer(myName(), token));
-  else { G.players.forEach((p,i) => p.connected = i === 0); G.players[0].token = token; }
+function startHost(code, saved, isLocal){
+  role = 'host'; roomCode = code; local = !!isLocal; G = saved || newGame();
+  if (!saved) G.players.push(mkPlayer(myName() || 'Du', token));
+  else { G.players.forEach((p,i) => p.connected = i === 0 || !!p.bot); G.players[0].token = token; G.tkey = null; }
+  if (local){ broadcast(); return; }
   $('#app').innerHTML = '<div class="panel">Erstelle Raum …</div>';
   mqConnect({topic:T('all'), payload:JSON.stringify({type:'hostgone'}), qos:1, retain:false},
     () => mq.subscribe(T('h'), {qos:1}, () => { pub('all', {type:'hostback'}); broadcast(); }),
@@ -430,11 +660,13 @@ function canPlayV(r){
   return r >= t;
 }
 function header(){
+  if (local) return `<header><b>Shithead</b><span class="muted">gegen ${V.players.length - 1} Bots</span><span class="sp"></span><button class="small-btn" data-act="quit">Beenden</button></header>`;
   return `<header><b>Shithead</b><span class="muted">Raum ${esc(V.code)}</span><span class="sp"></span><button class="small-btn" data-act="share">Link teilen</button></header>`;
 }
 
 function render(){
   if (!V) return renderStart();
+  if (V.left != null && V.until == null) V.until = Date.now() + V.left;
   const meP = V.players[V.me];
   const myTurn = V.phase === 'play' && V.turn === V.me;
   if (myTurn && lastTurn !== true){ try { navigator.vibrate && navigator.vibrate(120); } catch {} }
@@ -450,8 +682,10 @@ function lobbyHTML(){
     <p class="muted">Schick den Link an deine Leute. Wer ihn öffnet, sitzt mit am Tisch.</p>
     <button class="btn wide" data-act="share">Link teilen oder kopieren</button></div>
   <div class="panel"><b>Am Tisch (${V.players.length}/8)</b>
-    <ul class="plist">${V.players.map((p,k) => `<li>${esc(p.name)}${k === 0 ? ' <span class="muted">(Gastgeber)</span>' : ''}${k === V.me ? ' <span class="tag">du</span>' : ''}</li>`).join('')}</ul>
-    ${host ? `<button class="btn primary wide" data-act="start" ${V.players.length < 2 ? 'disabled' : ''}>Austeilen</button>${V.players.length < 2 ? '<p class="muted">Warte auf mindestens einen Mitspieler.</p>' : ''}`
+    <ul class="plist">${V.players.map((p,k) => `<li>${esc(p.name)}${k === 0 ? ' <span class="muted">(Gastgeber)</span>' : ''}${k === V.me ? ' <span class="tag">du</span>' : ''}${p.bot ? ` <span class="tag">Bot · ${LEVELS[p.bot]}</span>${host ? ` <button class="small-btn" data-act="kickbot" data-idx="${k}">entfernen</button>` : ''}` : ''}</li>`).join('')}</ul>
+    ${host ? botBar() : ''}
+    ${limitHTML(host)}
+    ${host ? `<button class="btn primary wide" data-act="start" ${V.players.length < 2 ? 'disabled' : ''}>Austeilen</button>${V.players.length < 2 ? '<p class="muted">Warte auf Mitspieler oder nimm einen Bot dazu.</p>' : ''}`
            : '<p class="muted">Warte, bis der Gastgeber austeilt.</p>'}
     ${RULES}</div>`;
 }
@@ -476,7 +710,7 @@ function gameHTML(meP, myTurn){
       : p.out ? `<span class="tag">${p.place+1}. raus</span>`
       : V.phase === 'swap' && p.ready ? '<span class="tag">bereit</span>'
       : turn ? '<span class="tag">am Zug</span>' : '';
-    opps += `<div class="opp ${turn ? 'turn' : ''} ${p.out ? 'out' : ''}"><div class="nm">${esc(p.name)} ${st}</div>
+    opps += `<div class="opp ${turn ? 'turn' : ''} ${p.out ? 'out' : ''}"><div class="nm">${esc(p.name)} ${st}</div>${p.bot ? `<div class="cnt">Bot · ${LEVELS[p.bot]}</div>` : ''}
       <div class="cnt">Hand ${p.hand} · verdeckt ${p.down}</div>
       <div class="mini">${p.up.map(c => cardHTML(c, {sm:true})).join('')}${!p.up.length && p.down ? Array.from({length:p.down}, () => backHTML({sm:true})).join('') : ''}</div></div>`;
   }
@@ -540,24 +774,33 @@ function gameHTML(meP, myTurn){
     const loser = V.loser != null ? V.players[V.loser].name : '–';
     actions = `<div class="panel" style="width:100%"><div class="big">Shithead: ${esc(loser)}</div>
       <ol>${V.finish.map(nm => `<li>${esc(nm)}</li>`).join('')}</ol>
-      ${host ? '<button class="btn primary wide" data-act="start">Neue Runde</button>' : '<p class="muted">Warte auf den Gastgeber für die nächste Runde.</p>'}</div>`;
+      ${host ? '<button class="btn primary wide" data-act="start">Neue Runde</button>' + botBar() + limitHTML(true) : '<p class="muted">Warte auf den Gastgeber für die nächste Runde.</p>'}</div>`;
   }
-  return `<div class="opps">${opps}</div>${center}${mine}<div class="actions">${actions}</div>${RULES}`;
+  return `<div class="opps">${opps}</div>${center}${mine}<div class="actions">${timerHTML()}${actions}</div>${RULES}`;
 }
 
 function renderStart(){
   const code = (params.get('room') || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0,4);
   const saved = ls.get('sh-host');
   const canResume = !code && saved && saved.G && saved.G.phase !== 'lobby' && Date.now() - saved.t < 12 * 3600e3;
+  const lvDesc = {hart:'spielt solide, macht aber Fehler.', uebel:'spielt klug und merkt sich viel.', crazy:'merkt sich alles, nutzt jede Sonderkarte und reagiert blitzschnell.'};
   $('#app').innerHTML = `<div class="games"><a class="on" href="./">Shithead</a><a href="kabuki.html">Kabuki</a></div>
-  <div class="panel">
-    <h1>Shithead</h1><p class="muted">Kartenspiel für 2 bis 8 Leute, jeder am eigenen Handy. Einer erstellt den Raum, die anderen öffnen den Link.</p>
-    <label for="name">Dein Name</label><input id="name" maxlength="16" autocomplete="nickname" value="${esc(myName())}">
-    ${code ? `<button class="btn primary wide" data-act="join" data-code="${code}">Raum ${code} beitreten</button>`
-      : `<button class="btn primary wide" data-act="host">Neues Spiel erstellen</button>
-         <div class="row"><input id="code" placeholder="Raumcode" maxlength="4" autocapitalize="characters"><button class="btn" data-act="joincode">Beitreten</button></div>`}
-    ${canResume ? `<button class="btn wide" data-act="resume">Mein Spiel ${esc(saved.code)} fortsetzen</button>` : ''}
-    ${RULES}</div>`;
+  <div class="panel"><h1>Shithead</h1><p class="muted">Kartenspiel für 2 bis 8 Leute, jeder am eigenen Handy. Alleine gegen Bots oder mit Freunden.</p>
+    <label for="name">Dein Name</label><input id="name" maxlength="16" autocomplete="nickname" value="${esc(myName())}"></div>
+  ${code ? `<div class="panel"><button class="btn primary wide" data-act="join" data-code="${code}">Raum ${code} beitreten</button></div>` : `
+  <div class="panel"><b>Alleine gegen Bots</b>
+    <div class="zone-label" style="margin-top:10px">Gegner</div>
+    <div class="chips">${[1,2,3,5,7].map(n => `<button class="chip${soloN === n ? ' on' : ''}" data-act="solon" data-n="${n}">${n}</button>`).join('')}</div>
+    <div class="zone-label" style="margin-top:10px">Stärke</div>
+    <div class="chips">${Object.entries(LEVELS).map(([k,v]) => `<button class="chip${soloLv === k ? ' on' : ''}" data-act="sololv" data-lv="${k}">${v}</button>`).join('')}</div>
+    <p class="muted" style="font-size:.9rem;margin:8px 0 0">${LEVELS[soloLv]} ${lvDesc[soloLv]}</p>
+    ${limitHTML(true, soloT, true)}
+    <button class="btn primary wide" data-act="solo">Spiel starten</button></div>
+  <div class="panel"><b>Mit Freunden</b><p class="muted" style="margin:4px 0 0">Einer erstellt den Raum, die anderen öffnen den Link. Bots kann der Gastgeber im Raum dazunehmen.</p>
+    <button class="btn wide" data-act="host">Raum erstellen</button>
+    <div class="row"><input id="code" placeholder="Raumcode" maxlength="4" autocapitalize="characters"><button class="btn" data-act="joincode">Beitreten</button></div></div>`}
+  ${canResume ? `<button class="btn wide" data-act="resume">${saved.local ? 'Meine Partie gegen Bots' : 'Mein Spiel ' + esc(saved.code)} fortsetzen</button>` : ''}
+  <div class="panel">${RULES}</div>`;
 }
 function takeName(){
   const v = ($('#name')?.value || '').trim().slice(0,16);
@@ -565,7 +808,14 @@ function takeName(){
   ls.set('sh-name', v); return true;
 }
 
+function keepName(){ const v = ($('#name')?.value || '').trim().slice(0,16); if (v) ls.set('sh-name', v); }
 const handlers = {
+  solo(){ const v = ($('#name')?.value || '').trim().slice(0,16) || 'Du'; ls.set('sh-name', v); startSolo(); },
+  solon(t){ keepName(); soloN = +t.dataset.n; saveSolo(); renderStart(); },
+  sololv(t){ keepName(); soloLv = t.dataset.lv; saveSolo(); renderStart(); },
+  addbot(t){ send({type:'addbot', level:t.dataset.level}); },
+  kickbot(t){ send({type:'kickbot', idx:+t.dataset.idx}); },
+  quit(){ if (!confirm('Partie beenden?')) return; try { localStorage.removeItem('sh-host'); } catch {} location.href = location.pathname; },
   host(){ if (takeName()) startHost(rid(4)); },
   join(t){ if (takeName()) startClient(t.dataset.code); },
   joincode(){
@@ -574,7 +824,7 @@ const handlers = {
     if (!takeName()) return;
     history.replaceState(null, '', '?room=' + c); startClient(c);
   },
-  resume(){ if (!takeName()) return; const s = ls.get('sh-host'); s.G.players[0].name = myName(); startHost(s.code, s.G); },
+  resume(){ if (!takeName()) return; const s = ls.get('sh-host'); s.G.players[0].name = myName(); startHost(s.code, s.G, s.local); },
   async share(){
     const url = shareLink();
     if (navigator.share){ try { await navigator.share({title:'Shithead', text:`Komm an den Tisch, Raum ${roomCode}`, url}); return; } catch {} }
