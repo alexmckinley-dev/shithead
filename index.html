@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f3d2e">
+<title>Shithead</title>
+<style>
+:root{--bg:#0f3d2e;--felt:#165a43;--line:#2a7559;--ink:#f3f1e8;--muted:#a9c2b6;--card:#fffdf7;--red:#c0392b;--black:#1d1d1f;--accent:#f5c542;--ok:#7ee0a8;--bad:#e0675a}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+body{min-height:100vh;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+#app{max-width:760px;margin:0 auto;padding:12px 16px 40px}
+h1{margin:.2em 0;font-size:2.2rem;letter-spacing:.02em}
+.muted{color:var(--muted)}
+.panel{background:var(--felt);border:1px solid var(--line);border-radius:14px;padding:16px;margin:12px 0}
+label{display:block;margin:12px 0 6px;color:var(--muted);font-size:.9rem}
+input{width:100%;font:inherit;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0b2e22;color:var(--ink)}
+.row{display:flex;gap:8px;margin-top:10px}
+.row input{flex:1}
+.btn{font:inherit;font-weight:600;padding:11px 16px;border-radius:10px;border:1px solid var(--line);background:#0b2e22;color:var(--ink);cursor:pointer}
+.btn.primary{background:var(--accent);color:#2a2100;border-color:var(--accent)}
+.btn.wide{width:100%;margin-top:12px}
+.btn:disabled{opacity:.4;cursor:default}
+header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+header b{font-size:1.2rem}
+header .sp{flex:1}
+.small-btn{font:inherit;font-size:.85rem;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:#0b2e22;color:var(--ink);cursor:pointer}
+#banner{display:none;background:var(--bad);color:#fff;text-align:center;padding:8px;font-weight:600}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#111c;color:#fff;padding:10px 16px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center;z-index:9}
+#toast.on{opacity:1}
+.code{font-size:2.4rem;font-weight:800;letter-spacing:.2em;color:var(--accent)}
+.plist{list-style:none;padding:0;margin:8px 0}
+.plist li{padding:6px 0;border-bottom:1px solid var(--line)}
+.opps{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.opp{background:var(--felt);border:2px solid var(--line);border-radius:12px;padding:8px}
+.opp.turn{border-color:var(--accent);box-shadow:0 0 0 2px #f5c54233}
+.opp.out{opacity:.55}
+.opp .nm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.opp .cnt{font-size:.8rem;color:var(--muted)}
+.mini{display:flex;gap:3px;margin-top:4px;min-height:48px;flex-wrap:wrap}
+.tag{font-size:.75rem;font-weight:600;color:var(--accent)}
+.center{display:flex;align-items:center;justify-content:center;gap:28px;padding:18px 0 8px}
+.stack{text-align:center;font-size:.8rem;color:var(--muted)}
+.pile{position:relative;width:96px;height:82px;margin:0 auto 4px}
+.pile .card{position:absolute;top:2px}
+.need{font-weight:700;color:var(--ink);font-size:.95rem}
+.log{font-size:.9rem;color:var(--muted);min-height:3.6em;text-align:center}
+.log div:last-child{color:var(--ink);font-weight:600}
+.mine{background:var(--felt);border:2px solid var(--line);border-radius:14px;padding:10px 12px;margin-top:10px}
+.mine.myturn{border-color:var(--accent)}
+.zone-label{font-size:.8rem;color:var(--muted);margin:6px 0 4px}
+.cards{display:flex;gap:6px;flex-wrap:wrap;min-height:78px;padding-top:10px}
+.card{width:54px;height:78px;border-radius:7px;background:var(--card);color:var(--black);border:1px solid #0004;position:relative;display:inline-flex;align-items:center;justify-content:center;font:700 15px system-ui,sans-serif;box-shadow:0 1px 3px #0006;padding:0;flex:none;cursor:pointer;transition:transform .1s}
+.card .r{position:absolute;top:3px;left:5px}
+.card .s{font-size:28px;line-height:1}
+.card.red{color:var(--red)}
+.card.back{background:repeating-linear-gradient(45deg,#7a2430 0 6px,#8e2c39 6px 12px);border:3px solid #fffdf7}
+.card.sm{width:34px;height:48px;font-size:11px}
+.card.sm .s{font-size:17px}
+.card.sm .r{top:1px;left:3px}
+.card.sel{transform:translateY(-10px);outline:3px solid var(--accent)}
+.card.ok{outline:2px solid var(--ok)}
+.card.sel.ok{outline:3px solid var(--accent)}
+.card.dim{opacity:.45}
+.card.pick{outline:3px solid var(--accent);transform:translateY(-6px)}
+.card:disabled{cursor:default}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center;position:sticky;bottom:0;background:var(--bg);padding:10px 0 calc(10px + env(safe-area-inset-bottom));z-index:5;border-top:1px solid var(--line)}
+.table-row{display:flex;gap:16px;flex-wrap:wrap}
+.actions .btn{flex:1;min-width:140px}
+.hint{width:100%;color:var(--muted);font-size:.9rem}
+.big{font-size:1.15rem;font-weight:700;width:100%}
+details{margin-top:14px}
+summary{cursor:pointer;color:var(--muted)}
+details ul{padding-left:20px;margin:8px 0}
+details li{margin:4px 0}
+</style>
+<script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
+</head>
+<body>
+<div id="banner"></div>
+<div id="app"></div>
+<div id="toast"></div>
+<script>
+'use strict';
+// ---------- Grundlagen ----------
+const PREFIX = 'shithead-gx7-';
+const SUITS = ['♠','♥','♦','♣'];
+const RL = {11:'B',12:'D',13:'K',14:'A'};
+const rl = r => RL[r] || String(r);
+const label = c => rl(c.r) + c.s;
+const SPECIAL = {2:15, 3:16, 8:17, 10:18};                   // gehen (fast) immer
+const key = r => SPECIAL[r] || r;                            // Sonderkarten rechts
+const sortCards = a => a.sort((x,y) => key(x.r)-key(y.r) || x.s.localeCompare(y.s));
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const $ = s => document.querySelector(s);
+const ls = {get(k){try{return JSON.parse(localStorage.getItem(k))}catch{return null}}, set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
+const ss = {get(k){try{return sessionStorage.getItem(k)}catch{return null}}, set(k,v){try{sessionStorage.setItem(k,v)}catch{}}};
+const rid = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => 'ABCDEFGHJKLMNPQRSTUVWXYZ'[b % 24]).join('');
+const params = new URLSearchParams(location.search);
+let token = ss.get('sh-token'); if (!token) { token = rid(12); ss.set('sh-token', token); }
+
+let joinName = '';
+let role = null, roomCode = null, mq = null, G = null, V = null;
+let sel = new Set(), swapPick = null, lastTurn = null, joinTimer = null, awaitingView = false, stopped = false;
+
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove('on'),2600); }
+function banner(msg){ const b=$('#banner'); b.textContent=msg; b.style.display=msg?'block':'none'; }
+function myName(){ return (ls.get('sh-name')||'').trim().slice(0,16); }
+function shareLink(){ return location.origin + location.pathname + '?room=' + roomCode; }
+
+// ---------- Spiellogik (läuft nur beim Gastgeber) ----------
+function newGame(){ return {phase:'lobby', players:[], deck:[], pile:[], burned:0, turn:-1, log:[], finish:[], loser:null, give:null}; }
+function mkPlayer(name, tok){ return {name, token:tok, hand:[], up:[], down:[], ready:false, out:false, connected:true}; }
+function log(msg){ G.log.push(msg); if (G.log.length > 30) G.log.shift(); }
+function shuffle(a){ for (let i=a.length-1;i>0;i--){ const j=crypto.getRandomValues(new Uint32Array(1))[0]%(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+function deal(){
+  G.players = G.players.filter((p,i) => i === 0 || p.connected);
+  const decks = G.players.length > 5 ? 2 : 1; let id = 0; const d = [];
+  for (let k=0;k<decks;k++) for (const s of SUITS) for (let r=2;r<=14;r++) d.push({r,s,id:id++});
+  G.deck = shuffle(d); G.pile = []; G.burned = 0; G.finish = []; G.loser = null; G.turn = -1; G.give = null;
+  for (const p of G.players){
+    p.down = G.deck.splice(0,3); p.up = G.deck.splice(0,3); p.hand = sortCards(G.deck.splice(0,3));
+    p.ready = false; p.out = false;
+  }
+  G.phase = 'swap';
+  log('Neue Runde. Tauscht Hand- und offene Karten, dann „Bereit“.');
+}
+// Hausregeln: 2 setzt zurück, 3 verteilt den Stapel, 7 = drunter, 8 durchsichtig, 10 verbrennt (nicht auf 7).
+function effTop(){ for (let k=G.pile.length-1; k>=0; k--) if (G.pile[k].r !== 8) return G.pile[k].r; return null; }
+function topRun(){
+  const n = G.pile.length; if (!n) return {r:null, n:0};
+  const r = G.pile[n-1].r; let k = 0; while (k < n && G.pile[n-1-k].r === r) k++;
+  return {r, n:k};
+}
+function canPlay(r){
+  const t = effTop();
+  if (r === 10) return t !== 7;
+  if (r === 2 || r === 3 || r === 8) return true;
+  if (t == null || t === 2) return true;
+  if (t === 7) return r <= 7;
+  return r >= t;
+}
+// Mit einer 2 darf man seine Hand nicht beenden (nur wenn nichts mehr nachgezogen wird).
+function endsWithTwo(p, src, cards){
+  return src === 'hand' && cards[0].r === 2 && p.hand.length === cards.length && !G.deck.length && G.pile.length > 0;
+}
+function pickCards(p, src, m){
+  const ids = Array.isArray(m.ids) ? m.ids : [];
+  const cards = ids.map(id => p[src].find(c => c.id === id));
+  if (!cards.length || cards.some(c => !c) || new Set(ids).size !== ids.length) return 'Ungültige Karten.';
+  if (new Set(cards.map(c => c.r)).size > 1) return 'Nur gleiche Werte zusammen legen.';
+  return cards;
+}
+function source(p){ return p.hand.length ? 'hand' : p.up.length ? 'up' : p.down.length ? 'down' : null; }
+function refill(p){ while (p.hand.length < 3 && G.deck.length) p.hand.push(G.deck.pop()); sortCards(p.hand); }
+function nextTurn(){
+  if (G.phase !== 'play') return;
+  let k = G.turn;
+  for (let n=0; n<G.players.length; n++){ k = (k+1) % G.players.length; if (!G.players[k].out) break; }
+  G.turn = k;
+}
+function checkOut(i){
+  const p = G.players[i];
+  if (p.hand.length || p.up.length || p.down.length) return;
+  p.out = true; G.finish.push(i); log(`${p.name} ist raus (Platz ${G.finish.length}).`);
+  const rest = G.players.map((q,k)=>k).filter(k => !G.players[k].out);
+  if (rest.length <= 1){ G.phase = 'over'; G.loser = rest[0] ?? null; if (G.loser != null) log(`${G.players[G.loser].name} ist der Shithead.`); }
+}
+function putOnPile(i, cards, note){
+  const p = G.players[i];
+  G.pile.push(...cards); refill(p);
+  const r = cards[0].r;
+  const burn = r === 10 || topRun().n >= 4;
+  let msg = `${p.name} legt ${cards.map(label).join(' ')}${note}.`;
+  if (burn){ G.burned += G.pile.length; G.pile = []; msg += ' Stapel verbrannt.'; }
+  log(msg);
+  G.turn = i;
+  if (!burn && r === 3){
+    const cand = G.players.map((q,k) => k).filter(k => k !== i && !G.players[k].out);
+    if (cand.length === 1) return giveTo(i, cand[0]);
+    G.give = i; return;
+  }
+  checkOut(i);
+  if (G.phase !== 'play') return;
+  if (burn && !p.out){ log(`${p.name} legt nochmal.`); return; }
+  nextTurn();
+}
+function giveTo(i, t){
+  const q = G.players[t], n = G.pile.length;
+  q.hand.push(...G.pile); G.pile = []; sortCards(q.hand); G.give = null;
+  log(`${G.players[i].name} gibt den Stapel an ${q.name} (${n} Karten).`);
+  G.turn = i; checkOut(i); nextTurn();
+}
+function beginPlay(){
+  G.phase = 'play'; let best = 0, bk = 99;
+  G.players.forEach((q,k) => { const m = Math.min(...q.hand.map(c => key(c.r))); if (m < bk){ bk = m; best = k; } });
+  G.turn = best; log(`Los geht's. ${G.players[best].name} hat die niedrigste Karte und fängt an.`);
+}
+
+function apply(i, m){
+  const p = G.players[i];
+  switch (m.type){
+    case 'start':
+      if (i !== 0) return 'Nur der Gastgeber startet.';
+      if (G.phase !== 'lobby' && G.phase !== 'over') return;
+      if (G.players.filter((q,k)=>k===0||q.connected).length < 2) return 'Mindestens zwei Spieler.';
+      deal(); return;
+    case 'swap': {
+      if (G.phase !== 'swap') return 'Tauschen geht nur vor dem Start.';
+      if (p.ready) return 'Du hast schon „Bereit“ gedrückt.';
+      const hi = p.hand.findIndex(c => c.id === m.handId), ui = p.up.findIndex(c => c.id === m.upId);
+      if (hi < 0 || ui < 0) return 'Ungültiger Tausch.';
+      [p.hand[hi], p.up[ui]] = [p.up[ui], p.hand[hi]]; sortCards(p.hand); return;
+    }
+    case 'ready':
+      if (G.phase !== 'swap') return;
+      p.ready = true; log(`${p.name} ist bereit.`);
+      if (G.players.every(q => q.ready)) beginPlay();
+      return;
+    case 'skip': {
+      if (i !== 0) return;
+      if (G.phase === 'swap'){ G.players.forEach(q => { if (!q.connected) q.ready = true; }); if (G.players.every(q => q.ready)) beginPlay(); return; }
+      if (G.phase === 'play' && G.give != null && !G.players[G.give].connected){
+        let t = G.give; do { t = (t+1) % G.players.length; } while (G.players[t].out || t === G.give);
+        giveTo(G.give, t); return;
+      }
+      if (G.phase === 'play' && !G.players[G.turn].connected){ log(`${G.players[G.turn].name} wird übersprungen.`); nextTurn(); }
+      return;
+    }
+  }
+  if (G.phase !== 'play') return 'Gerade nicht.';
+  const src = source(p);
+  if (m.type === 'give'){
+    if (G.give !== i) return;
+    const t = +m.to;
+    if (!G.players[t] || t === i || G.players[t].out) return 'Ungültig.';
+    giveTo(i, t); return;
+  }
+  if (G.give != null) return `${G.players[G.give].name} verteilt gerade den Stapel.`;
+  if (m.type === 'throw'){
+    // Vierer vollmachen geht jederzeit, auch außer der Reihe.
+    if (p.out) return;
+    if (src !== 'hand' && src !== 'up') return 'Reinwerfen geht nur mit Hand- oder offenen Karten.';
+    const cards = pickCards(p, src, m); if (typeof cards === 'string') return cards;
+    const run = topRun();
+    if (!run.n || cards[0].r !== run.r) return 'Nur Karten, die vier gleiche vollmachen.';
+    if (run.n + cards.length < 4) return 'Das reicht noch nicht für vier.';
+    if (endsWithTwo(p, src, cards)) return 'Mit einer 2 darfst du deine Hand nicht beenden.';
+    const ids = cards.map(c => c.id); p[src] = p[src].filter(c => !ids.includes(c.id));
+    putOnPile(i, cards, ' außer der Reihe'); return;
+  }
+  if (G.turn !== i) return 'Du bist nicht dran.';
+  if (m.type === 'play'){
+    if (src !== 'hand' && src !== 'up') return 'Tippe eine verdeckte Karte.';
+    const cards = pickCards(p, src, m); if (typeof cards === 'string') return cards;
+    const r = cards[0].r;
+    if (!canPlay(r)) return r === 10 ? 'Eine 10 darf nicht auf eine 7.' : effTop() === 7 ? 'Nach einer 7 musst du drunter.' : 'Zu niedrig.';
+    if (endsWithTwo(p, src, cards)) return 'Mit einer 2 darfst du deine Hand nicht beenden.';
+    const ids = cards.map(c => c.id); p[src] = p[src].filter(c => !ids.includes(c.id));
+    putOnPile(i, cards, src === 'up' ? ' (offen)' : '');
+    return;
+  }
+  if (m.type === 'pickup'){
+    if (!G.pile.length) return 'Der Stapel ist leer.';
+    const n = G.pile.length; p.hand.push(...G.pile); G.pile = []; sortCards(p.hand);
+    log(`${p.name} nimmt den Stapel auf (${n} Karten).`); nextTurn(); return;
+  }
+  if (m.type === 'blind'){
+    if (src !== 'down') return 'Erst Hand und offene Karten.';
+    const c = p.down[m.idx]; if (!c) return 'Ungültig.';
+    p.down.splice(m.idx, 1);
+    if (canPlay(c.r)) { putOnPile(i, [c], ' (blind)'); return; }
+    const n = G.pile.length + 1; p.hand.push(...G.pile, c); G.pile = []; sortCards(p.hand);
+    log(`${p.name} deckt ${label(c)} auf. Passt nicht, nimmt den Stapel (${n} Karten).`); nextTurn(); return;
+  }
+  return 'Unbekannte Aktion.';
+}
+
+function view(i){
+  return {
+    phase:G.phase, me:i, code:roomCode, turn:G.turn, log:G.log.slice(-3),
+    players:G.players.map((p,k) => ({name:p.name, hand:p.hand.length, up:p.up, down:p.down.length, out:p.out, ready:p.ready, connected:p.connected, place:G.finish.indexOf(k)})),
+    hand:G.players[i].hand, pile:G.pile.slice(-4), pileCount:G.pile.length, eff:effTop(), run:topRun(), give:G.give, deck:G.deck.length, burned:G.burned, loser:G.loser,
+    finish:G.finish.map(k => G.players[k].name)
+  };
+}
+function broadcast(){
+  G.players.forEach((p,i) => {
+    if (i === 0){ V = view(0); render(); return; }
+    pub('p/' + p.token, {type:'view', view:view(i)});
+  });
+  ls.set('sh-host', {code:roomCode, G, t:Date.now()});
+}
+function tell(i, msg){
+  if (i === 0) return toast(msg);
+  pub('p/' + G.players[i].token, {type:'error', msg});
+}
+function act(i, m){ const err = apply(i, m); if (err) tell(i, err); broadcast(); }
+
+// ---------- Netzwerk ----------
+// Alle Nachrichten laufen über einen öffentlichen MQTT-Server (verschlüsselter Websocket).
+// Kanäle je Raum: h = an den Gastgeber, p/<token> = an einen Spieler, all = an alle.
+const BROKER = 'wss://broker.hivemq.com:8884/mqtt';
+const TOPIC = 'shithead-gx7/';
+const T = sub => TOPIC + roomCode + '/' + sub;
+function pub(sub, obj){ if (mq && mq.connected) mq.publish(T(sub), JSON.stringify(obj), {qos:1}); }
+function mqConnect(will, onConnect, onMsg){
+  mq = mqtt.connect(BROKER, {clientId:'sh_' + rid(12), keepalive:15, reconnectPeriod:2000, connectTimeout:10000, clean:true, will});
+  mq.on('connect', () => { banner(''); onConnect(); });
+  mq.on('reconnect', () => { if (!stopped) banner('Verbindung weg, verbinde neu …'); });
+  mq.on('offline', () => { if (!stopped) banner('Keine Verbindung, verbinde neu …'); });
+  mq.on('message', (topic, buf) => { let m; try { m = JSON.parse(buf.toString()); } catch { return; } if (m && typeof m === 'object') onMsg(topic, m); });
+}
+
+// Gastgeber
+function startHost(code, saved){
+  role = 'host'; roomCode = code; G = saved || newGame();
+  if (!saved) G.players.push(mkPlayer(myName(), token));
+  else { G.players.forEach((p,i) => p.connected = i === 0); G.players[0].token = token; }
+  $('#app').innerHTML = '<div class="panel">Erstelle Raum …</div>';
+  mqConnect({topic:T('all'), payload:JSON.stringify({type:'hostgone'}), qos:1, retain:false},
+    () => mq.subscribe(T('h'), {qos:1}, () => { pub('all', {type:'hostback'}); broadcast(); }),
+    (topic, m) => onHostData(m));
+}
+function onHostData(m){
+  const tok = typeof m.from === 'string' ? m.from : null; if (!tok) return;
+  if (m.type === 'join'){
+    const name = String(m.name || '').trim().slice(0,16) || 'Gast';
+    let i = G.players.findIndex((p,k) => k > 0 && p.token === tok);
+    if (i < 0 && G.phase !== 'lobby') i = G.players.findIndex((p,k) => k > 0 && !p.connected && p.name.toLowerCase() === name.toLowerCase());
+    if (i < 0){
+      if (G.phase !== 'lobby') return pub('p/' + tok, {type:'fatal', msg:'Hier läuft gerade eine Runde. Steig ein, wenn die nächste beginnt: Seite dann neu laden.'});
+      if (G.players.length >= 8) return pub('p/' + tok, {type:'fatal', msg:'Der Tisch ist voll (8 Leute).'});
+      G.players.push(mkPlayer(name, tok)); log(`${name} ist da.`);
+    } else {
+      const p = G.players[i];
+      if (!p.connected) log(`${p.name} ist wieder da.`);
+      p.token = tok; p.connected = true;
+    }
+    broadcast(); return;
+  }
+  const i = G.players.findIndex((p,k) => k > 0 && p.token === tok);
+  if (i < 0) return;
+  const p = G.players[i];
+  if (m.type === 'bye'){
+    if (G.phase === 'lobby'){ G.players.splice(i, 1); log(`${p.name} ist gegangen.`); }
+    else if (p.connected){ p.connected = false; log(`${p.name} hat die Verbindung verloren.`); }
+    broadcast(); return;
+  }
+  if (!p.connected){ p.connected = true; log(`${p.name} ist wieder da.`); }
+  act(i, m);
+}
+
+// Mitspieler
+function startClient(code){
+  joinName = myName(); role = 'client'; roomCode = code.toUpperCase();
+  $('#app').innerHTML = `<div class="panel">Verbinde mit Raum ${esc(roomCode)} …</div>`;
+  mqConnect({topic:T('h'), payload:JSON.stringify({type:'bye', from:token}), qos:1, retain:false},
+    () => mq.subscribe([T('p/' + token), T('all')], {qos:1}, () => sendJoin()),
+    (topic, m) => {
+      if (stopped) return;
+      if (topic === T('all')){
+        if (m.type === 'hostgone') banner('Der Gastgeber ist gerade weg. Sobald er zurück ist, geht es weiter.');
+        else if (m.type === 'hostback'){ banner(''); sendJoin(); }
+        return;
+      }
+      if (m.type === 'view'){ awaitingView = false; banner(''); V = m.view; render(); }
+      else if (m.type === 'error') toast(m.msg);
+      else if (m.type === 'fatal'){ stopped = true; clearTimeout(joinTimer); mq.end(); banner(''); $('#app').innerHTML = `<div class="panel"><b>${esc(m.msg)}</b></div>`; }
+    });
+}
+function sendJoin(){
+  if (stopped) return;
+  awaitingView = true;
+  pub('h', {type:'join', name:joinName, from:token});
+  clearTimeout(joinTimer);
+  joinTimer = setTimeout(() => {
+    if (!awaitingView || stopped) return;
+    if (!V) $('#app').innerHTML = `<div class="panel"><b>Raum ${esc(roomCode)} antwortet nicht.</b><p class="muted">Ich versuche es weiter. Läuft das Spiel beim Gastgeber, und ist der Code richtig?</p><a class="btn wide" href="${esc(location.pathname)}">Zurück</a></div>`;
+    else banner('Der Gastgeber antwortet nicht, versuche weiter …');
+    sendJoin();
+  }, 6000);
+}
+function send(m){
+  if (role === 'host') return act(0, m);
+  if (mq && mq.connected) pub('h', {...m, from:token}); else toast('Nicht verbunden.');
+}
+window.addEventListener('pagehide', () => { if (role === 'client') pub('h', {type:'bye', from:token}); });
+
+// ---------- Oberfläche ----------
+const RULES = `<details><summary>Spielregeln</summary><ul>
+<li>Jeder bekommt 3 verdeckte, 3 offene und 3 Handkarten. Vor dem Start darfst du Hand- und offene Karten tauschen.</li>
+<li>Wer dran ist, legt eine oder mehrere gleiche Karten, mindestens so hoch wie die oberste. Ass ist hoch. Danach auf 3 Handkarten nachziehen, solange der Talon reicht.</li>
+<li><b>2, 3, 8 und 10</b> gehen immer. Ausnahme: die 10 nie auf eine 7.</li>
+<li><b>2</b> setzt zurück auf 2: danach geht alles.</li>
+<li><b>3</b>: du gibst den ganzen Stapel einem Mitspieler deiner Wahl.</li>
+<li><b>7</b>: der Nächste muss drunter (7 oder kleiner, oder 2, 3, 8). Die 7 selbst ist keine Joker-Karte, sie geht nicht auf Bube und höher.</li>
+<li><b>8</b> ist durchsichtig: es gilt die Karte darunter.</li>
+<li><b>10</b> verbrennt den Stapel. Vier gleiche Karten hintereinander verbrennen ihn auch. Wer verbrennt, legt nochmal.</li>
+<li>Liegen schon gleiche Karten oben, darfst du die fehlenden zum Vierer jederzeit reinwerfen, auch wenn du nicht dran bist. Dann legst du nochmal.</li>
+<li>Deine Hand darfst du nicht mit einer 2 als letzter Karte beenden.</li>
+<li>Wer nicht kann oder will, nimmt den Stapel auf.</li>
+<li>Hand leer und Talon leer: erst die offenen, dann blind die verdeckten Karten. Passt die verdeckte nicht, nimmst du sie mit dem Stapel auf.</li>
+<li>Wer zuletzt noch Karten hat, ist der Shithead. Ab 6 Leuten wird mit zwei Kartendecks gespielt.</li></ul></details>`;
+
+function cardHTML(c, o = {}){
+  const cls = ['card', (c.s === '♥' || c.s === '♦') ? 'red' : '', o.sm ? 'sm' : '', o.sel ? 'sel' : '', o.ok ? 'ok' : '', o.dim ? 'dim' : '', o.pick ? 'pick' : ''].join(' ');
+  const attr = o.zone ? `data-act="card" data-zone="${o.zone}" data-id="${c.id}"` : 'disabled';
+  return `<button class="${cls}" ${attr} style="${o.style||''}" aria-label="${label(c)}"><span class="r">${rl(c.r)}</span><span class="s">${c.s}</span></button>`;
+}
+function backHTML(o = {}){
+  const attr = o.idx != null ? `data-act="blind" data-idx="${o.idx}" class="card back ok"` : `class="card back${o.sm ? ' sm' : ''}" disabled`;
+  return `<button ${attr} aria-label="verdeckte Karte"></button>`;
+}
+function canPlayV(r){
+  const t = V.eff;
+  if (r === 10) return t !== 7;
+  if (r === 2 || r === 3 || r === 8) return true;
+  if (t == null || t === 2) return true;
+  if (t === 7) return r <= 7;
+  return r >= t;
+}
+function header(){
+  return `<header><b>Shithead</b><span class="muted">Raum ${esc(V.code)}</span><span class="sp"></span><button class="small-btn" data-act="share">Link teilen</button></header>`;
+}
+
+function render(){
+  if (!V) return renderStart();
+  const meP = V.players[V.me];
+  const myTurn = V.phase === 'play' && V.turn === V.me;
+  if (myTurn && lastTurn !== true){ try { navigator.vibrate && navigator.vibrate(120); } catch {} }
+  lastTurn = myTurn;
+  document.title = myTurn ? '▶ Du bist dran – Shithead' : 'Shithead';
+  $('#app').innerHTML = header() + (V.phase === 'lobby' ? lobbyHTML() : gameHTML(meP, myTurn));
+}
+
+function lobbyHTML(){
+  const host = V.me === 0;
+  return `<div class="panel" style="text-align:center">
+    <div class="muted">Raumcode</div><div class="code">${esc(V.code)}</div>
+    <p class="muted">Schick den Link an deine Leute. Wer ihn öffnet, sitzt mit am Tisch.</p>
+    <button class="btn wide" data-act="share">Link teilen oder kopieren</button></div>
+  <div class="panel"><b>Am Tisch (${V.players.length}/8)</b>
+    <ul class="plist">${V.players.map((p,k) => `<li>${esc(p.name)}${k === 0 ? ' <span class="muted">(Gastgeber)</span>' : ''}${k === V.me ? ' <span class="tag">du</span>' : ''}</li>`).join('')}</ul>
+    ${host ? `<button class="btn primary wide" data-act="start" ${V.players.length < 2 ? 'disabled' : ''}>Austeilen</button>${V.players.length < 2 ? '<p class="muted">Warte auf mindestens einen Mitspieler.</p>' : ''}`
+           : '<p class="muted">Warte, bis der Gastgeber austeilt.</p>'}
+    ${RULES}</div>`;
+}
+
+function gameHTML(meP, myTurn){
+  const n = V.players.length;
+  const src = V.hand.length ? 'hand' : meP.up.length ? 'up' : meP.down ? 'down' : null;
+  const srcArr = src === 'hand' ? V.hand : src === 'up' ? meP.up : [];
+  const canThrowNow = V.phase === 'play' && V.give == null && !meP.out && !myTurn && V.run.n > 0;
+  const throwableV = c => canThrowNow && c.r === V.run.r && V.run.n + srcArr.filter(x => x.r === c.r).length >= 4;
+  for (const id of [...sel]){
+    const c = srcArr.find(x => x.id === id);
+    if (!c || (!myTurn && !throwableV(c)) || V.give != null) sel.delete(id);
+  }
+  if (V.phase !== 'swap') swapPick = null;
+
+  let opps = '';
+  for (let k = 1; k < n; k++){
+    const idx = (V.me + k) % n, p = V.players[idx];
+    const turn = V.phase === 'play' && V.turn === idx;
+    const st = !p.connected ? '<span class="tag" style="color:var(--bad)">offline</span>'
+      : p.out ? `<span class="tag">${p.place+1}. raus</span>`
+      : V.phase === 'swap' && p.ready ? '<span class="tag">bereit</span>'
+      : turn ? '<span class="tag">am Zug</span>' : '';
+    opps += `<div class="opp ${turn ? 'turn' : ''} ${p.out ? 'out' : ''}"><div class="nm">${esc(p.name)} ${st}</div>
+      <div class="cnt">Hand ${p.hand} · verdeckt ${p.down}</div>
+      <div class="mini">${p.up.map(c => cardHTML(c, {sm:true})).join('')}${!p.up.length && p.down ? Array.from({length:p.down}, () => backHTML({sm:true})).join('') : ''}</div></div>`;
+  }
+
+  const top = V.pile[V.pile.length-1], t7 = V.eff;
+  let need = t7 == null ? 'alles geht' : t7 === 2 ? 'alles geht (2)' : t7 === 7 ? 'drunter: max. 7' : `mind. ${rl(t7)}`;
+  if (top && top.r === 8) need += ' (8 durchsichtig)';
+  const pile = V.pile.map((c,k) => cardHTML(c, {style:`left:${k*12}px`})).join('');
+  const center = `<div class="center">
+    <div class="stack"><div class="pile" style="width:60px">${V.deck ? backHTML() : ''}</div>Talon ${V.deck}</div>
+    <div class="stack"><div class="pile">${pile}</div>Stapel ${V.pileCount} · <span class="need">${need}</span></div>
+  </div><div class="log">${V.log.map(l => `<div>${esc(l)}</div>`).join('')}</div>`;
+
+  const swap = V.phase === 'swap' && !meP.ready;
+  const zoneOpts = (c, zone) => {
+    if (swap) return {zone, pick: swapPick && swapPick.id === c.id};
+    if (myTurn && V.give == null && src === zone){ const ok = canPlayV(c.r); return {zone, sel: sel.has(c.id), ok, dim: !ok}; }
+    if (src === zone && throwableV(c)) return {zone, sel: sel.has(c.id), ok: true};
+    return {};
+  };
+  const ups = meP.up.map(c => cardHTML(c, zoneOpts(c, 'up'))).join('');
+  const downs = Array.from({length: meP.down}, (_, k) => backHTML(myTurn && V.give == null && src === 'down' ? {idx:k} : {})).join('');
+  const hand = V.hand.map(c => cardHTML(c, zoneOpts(c, 'hand'))).join('');
+  const mine = `<div class="mine ${myTurn ? 'myturn' : ''}">
+    <div class="zone-label">Hand (${V.hand.length})</div><div class="cards">${hand || '<span class="muted">–</span>'}</div>
+    <div class="table-row"><div><div class="zone-label">Offen</div><div class="cards">${ups || '<span class="muted">–</span>'}</div></div>
+    <div><div class="zone-label">Verdeckt</div><div class="cards">${downs || '<span class="muted">–</span>'}</div></div></div></div>`;
+
+  let actions = '';
+  const host = V.me === 0;
+  if (V.phase === 'swap'){
+    if (!meP.ready) actions = `<div class="hint">Tippe eine Handkarte und eine offene Karte, um sie zu tauschen. Starke Karten (2, 3, 8, 10, Ass) gehören nach oben.</div><button class="btn primary" data-act="ready">Bereit</button>`;
+    else actions = `<div class="hint">Warte auf die anderen …</div>`;
+    if (host && V.players.some(p => !p.connected && !p.ready)) actions += `<button class="btn" data-act="skip">Offline-Spieler als bereit setzen</button>`;
+  } else if (V.phase === 'play'){
+    if (meP.out) actions = `<div class="big">Du bist raus, Platz ${meP.place+1}.</div>`;
+    else if (V.give === V.me){
+      actions = `<div class="big">Wem gibst du den Stapel?</div>` + V.players.map((p,k) => k !== V.me && !p.out
+        ? `<button class="btn" data-act="give" data-to="${k}">${esc(p.name)}</button>` : '').join('');
+    } else if (V.give != null){
+      const g = V.players[V.give];
+      actions = `<div class="hint">${esc(g.name)} verteilt den Stapel …</div>`;
+      if (host && !g.connected) actions += `<button class="btn" data-act="skip">Für ${esc(g.name)} weitergeben</button>`;
+    } else if (myTurn){
+      const selCards = srcArr.filter(c => sel.has(c.id));
+      const canGo = selCards.length && canPlayV(selCards[0].r);
+      actions = src === 'down'
+        ? `<div class="big">Du bist dran.</div><div class="hint">Tippe eine verdeckte Karte. Reine Glückssache.</div>`
+        : `<div class="big">Du bist dran.</div><button class="btn primary" data-act="play" ${canGo ? '' : 'disabled'}>Legen${selCards.length ? ' (' + selCards.map(label).join(' ') + ')' : ''}</button>`;
+      actions += `<button class="btn" data-act="pickup" ${V.pileCount ? '' : 'disabled'}>Stapel aufnehmen</button>`;
+    } else {
+      const t = V.players[V.turn];
+      actions = `<div class="hint">${esc(t.name)} ist dran.</div>`;
+      if (srcArr.some(throwableV)){
+        const ts = srcArr.filter(c => sel.has(c.id));
+        actions += `<div class="hint">Du kannst den Vierer vollmachen.</div><button class="btn primary" data-act="throw" ${ts.length && V.run.n + ts.length >= 4 ? '' : 'disabled'}>Reinwerfen${ts.length ? ' (' + ts.map(label).join(' ') + ')' : ''}</button>`;
+      }
+      if (host && !t.connected) actions += `<button class="btn" data-act="skip">${esc(t.name)} überspringen</button>`;
+    }
+  } else if (V.phase === 'over'){
+    const loser = V.loser != null ? V.players[V.loser].name : '–';
+    actions = `<div class="panel" style="width:100%"><div class="big">Shithead: ${esc(loser)}</div>
+      <ol>${V.finish.map(nm => `<li>${esc(nm)}</li>`).join('')}</ol>
+      ${host ? '<button class="btn primary wide" data-act="start">Neue Runde</button>' : '<p class="muted">Warte auf den Gastgeber für die nächste Runde.</p>'}</div>`;
+  }
+  return `<div class="opps">${opps}</div>${center}${mine}<div class="actions">${actions}</div>${RULES}`;
+}
+
+function renderStart(){
+  const code = (params.get('room') || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0,4);
+  const saved = ls.get('sh-host');
+  const canResume = !code && saved && saved.G && saved.G.phase !== 'lobby' && Date.now() - saved.t < 12 * 3600e3;
+  $('#app').innerHTML = `<div class="panel">
+    <h1>Shithead</h1><p class="muted">Kartenspiel für 2 bis 8 Leute, jeder am eigenen Handy. Einer erstellt den Raum, die anderen öffnen den Link.</p>
+    <label for="name">Dein Name</label><input id="name" maxlength="16" autocomplete="nickname" value="${esc(myName())}">
+    ${code ? `<button class="btn primary wide" data-act="join" data-code="${code}">Raum ${code} beitreten</button>`
+      : `<button class="btn primary wide" data-act="host">Neues Spiel erstellen</button>
+         <div class="row"><input id="code" placeholder="Raumcode" maxlength="4" autocapitalize="characters"><button class="btn" data-act="joincode">Beitreten</button></div>`}
+    ${canResume ? `<button class="btn wide" data-act="resume">Mein Spiel ${esc(saved.code)} fortsetzen</button>` : ''}
+    ${RULES}</div>`;
+}
+function takeName(){
+  const v = ($('#name')?.value || '').trim().slice(0,16);
+  if (!v){ toast('Gib erst deinen Namen ein.'); $('#name')?.focus(); return false; }
+  ls.set('sh-name', v); return true;
+}
+
+const handlers = {
+  host(){ if (takeName()) startHost(rid(4)); },
+  join(t){ if (takeName()) startClient(t.dataset.code); },
+  joincode(){
+    const c = ($('#code').value || '').toUpperCase().replace(/[^A-Z]/g, '');
+    if (c.length !== 4) return toast('Der Raumcode hat vier Buchstaben.');
+    if (!takeName()) return;
+    history.replaceState(null, '', '?room=' + c); startClient(c);
+  },
+  resume(){ if (!takeName()) return; const s = ls.get('sh-host'); s.G.players[0].name = myName(); startHost(s.code, s.G); },
+  async share(){
+    const url = shareLink();
+    if (navigator.share){ try { await navigator.share({title:'Shithead', text:`Komm an den Tisch, Raum ${roomCode}`, url}); return; } catch {} }
+    try { await navigator.clipboard.writeText(url); toast('Link kopiert.'); } catch { prompt('Link kopieren:', url); }
+  },
+  start(){ send({type:'start'}); },
+  ready(){ send({type:'ready'}); },
+  skip(){ send({type:'skip'}); },
+  play(){ send({type:'play', ids:[...sel]}); sel.clear(); },
+  pickup(){ send({type:'pickup'}); sel.clear(); },
+  throw(){ send({type:'throw', ids:[...sel]}); sel.clear(); },
+  give(t){ send({type:'give', to:+t.dataset.to}); },
+  blind(t){ send({type:'blind', idx:+t.dataset.idx}); },
+  card(t){
+    const zone = t.dataset.zone, id = +t.dataset.id, meP = V.players[V.me];
+    if (V.phase === 'swap'){
+      if (!swapPick || swapPick.zone === zone){ swapPick = swapPick && swapPick.id === id ? null : {zone, id}; return render(); }
+      const handId = zone === 'hand' ? id : swapPick.id, upId = zone === 'up' ? id : swapPick.id;
+      swapPick = null; return send({type:'swap', handId, upId});
+    }
+    const arr = zone === 'hand' ? V.hand : meP.up;
+    const c = arr.find(x => x.id === id); if (!c) return;
+    const first = arr.find(x => sel.has(x.id));
+    if (first && first.r !== c.r) sel.clear();
+    sel.has(id) ? sel.delete(id) : sel.add(id);
+    render();
+  }
+};
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act]'); if (!t || t.disabled) return;
+  handlers[t.dataset.act]?.(t);
+});
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && !V && e.target.id === 'code') handlers.joincode(); });
+if (typeof mqtt === 'undefined') { document.body.innerHTML = '<p style="padding:16px">Die Verbindungsbibliothek konnte nicht geladen werden. Internetverbindung prüfen und neu laden.</p>'; }
+else renderStart();
+</script>
+</body>
+</html>
