@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f3d2e">
+<title>Volle Reihe</title>
+<style>
+:root{--bg:#0f3d2e;--felt:#165a43;--line:#2a7559;--ink:#f3f1e8;--muted:#a9c2b6;--card:#fffdf7;--red:#c0392b;--black:#1d1d1f;--accent:#f5c542;--ok:#7ee0a8;--bad:#e0675a;--joker:#6b3fa0}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+body{min-height:100vh;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+#app{max-width:760px;margin:0 auto;padding:12px 16px 40px}
+h1{margin:.2em 0;font-size:2.2rem;letter-spacing:.02em}
+.muted{color:var(--muted)}
+.panel{background:var(--felt);border:1px solid var(--line);border-radius:14px;padding:16px;margin:12px 0}
+label{display:block;margin:12px 0 6px;color:var(--muted);font-size:.9rem}
+input{width:100%;font:inherit;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0b2e22;color:var(--ink)}
+.row{display:flex;gap:8px;margin-top:10px}
+.row input{flex:1}
+.btn{font:inherit;font-weight:600;padding:11px 16px;border-radius:10px;border:1px solid var(--line);background:#0b2e22;color:var(--ink);cursor:pointer}
+.btn.primary{background:var(--accent);color:#2a2100;border-color:var(--accent)}
+.btn.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn.wide{width:100%;margin-top:12px}
+.btn:disabled{opacity:.4;cursor:default}
+.games{display:flex;gap:6px;margin-bottom:10px}
+.games a{flex:1;text-align:center;padding:9px;border-radius:10px;border:1px solid var(--line);color:var(--ink);text-decoration:none;font-weight:600}
+.games a.on{background:var(--accent);color:#2a2100;border-color:var(--accent)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font:inherit;font-weight:600;min-width:46px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:#0b2e22;color:var(--ink);cursor:pointer}
+.chip.on{background:var(--accent);color:#2a2100;border-color:var(--accent)}
+.botbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.limit{margin-top:12px}
+.limit input[type=range]{padding:0;border:0;background:none;accent-color:var(--accent);height:32px}
+.timer{position:relative;width:100%;height:28px;border-radius:8px;border:1px solid var(--line);background:#0b2e22;overflow:hidden}
+.timer i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);opacity:.4;transition:width .2s linear}
+.timer span{position:relative;display:block;text-align:center;font-weight:700;line-height:26px}
+.timer.low i{background:var(--bad);opacity:.7}
+header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+header b{font-size:1.2rem}
+header .sp{flex:1}
+.small-btn{font:inherit;font-size:.85rem;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:#0b2e22;color:var(--ink);cursor:pointer}
+#banner{display:none;background:var(--bad);color:#fff;text-align:center;padding:8px;font-weight:600}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#111c;color:#fff;padding:10px 16px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center;z-index:9}
+#toast.on{opacity:1}
+.code{font-size:2.4rem;font-weight:800;letter-spacing:.2em;color:var(--accent)}
+.plist{list-style:none;padding:0;margin:8px 0}
+.plist li{padding:6px 0;border-bottom:1px solid var(--line)}
+.opps{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.opp{background:var(--felt);border:2px solid var(--line);border-radius:12px;padding:8px}
+.opp.turn{border-color:var(--accent);box-shadow:0 0 0 2px #f5c54233}
+.opp .nm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.opp .cnt{font-size:.8rem;color:var(--muted)}
+.tag{font-size:.75rem;font-weight:600;color:var(--accent)}
+.grid{display:grid;grid-template-columns:repeat(2,max-content);gap:8px;margin-top:6px}
+.opp .grid{gap:5px}
+.center{display:flex;align-items:flex-start;justify-content:center;gap:22px;padding:18px 0 8px}
+.stack{text-align:center;font-size:.8rem;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:4px;min-width:64px}
+.log{font-size:.9rem;color:var(--muted);min-height:4.8em;text-align:center}
+.log div:last-child{color:var(--ink);font-weight:600}
+.mine{background:var(--felt);border:2px solid var(--line);border-radius:14px;padding:10px 12px;margin-top:10px;display:flex;flex-direction:column;align-items:center}
+.mine.myturn{border-color:var(--accent)}
+.zone-label{font-size:.8rem;color:var(--muted);margin:2px 0 4px;align-self:flex-start}
+.card{width:58px;height:84px;border-radius:7px;background:var(--card);color:var(--black);border:1px solid #0004;position:relative;display:inline-flex;align-items:center;justify-content:center;font:700 15px system-ui,sans-serif;box-shadow:0 1px 3px #0006;padding:0;flex:none;cursor:pointer;transition:transform .1s}
+.card .r{position:absolute;top:3px;left:5px}
+.card .s{font-size:28px;line-height:1}
+.card .v{position:absolute;bottom:2px;right:5px;font-size:11px;opacity:.7}
+.card.red{color:var(--red)}
+.card.joker{color:var(--joker)}
+.card.back{background:repeating-linear-gradient(45deg,#7a2430 0 6px,#8e2c39 6px 12px);border:3px solid #fffdf7}
+.card.empty{background:transparent;border:2px dashed var(--line);box-shadow:none;cursor:default}
+.card.sm{width:36px;height:52px;font-size:11px}
+.card.sm .s{font-size:17px}
+.card.sm .r{top:1px;left:3px}
+.card.sm .v{display:none}
+.card.ok{outline:2px solid var(--ok)}
+.card.peek{outline:3px solid var(--accent)}
+.card.pick{outline:3px solid var(--accent);transform:translateY(-6px)}
+.card:disabled{cursor:default}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center;position:sticky;bottom:0;background:var(--bg);padding:10px 0 calc(10px + env(safe-area-inset-bottom));z-index:5;border-top:1px solid var(--line)}
+.actions .btn{flex:1;min-width:130px}
+.hint{width:100%;color:var(--muted);font-size:.9rem}
+.big{font-size:1.15rem;font-weight:700;width:100%}
+.warn{width:100%;background:#f5c54222;border:1px solid var(--accent);border-radius:10px;padding:6px 10px;font-weight:600}
+table.res{width:100%;border-collapse:collapse;margin-top:8px}
+table.res td{padding:6px 4px;border-bottom:1px solid var(--line);vertical-align:middle}
+table.res .cards{display:flex;gap:3px;flex-wrap:wrap}
+details{margin-top:14px}
+summary{cursor:pointer;color:var(--muted)}
+details ul{padding-left:20px;margin:8px 0}
+details li{margin:4px 0}
+.rows{display:flex;flex-direction:column;gap:6px;margin:14px 0 6px}
+.rowline{display:flex;align-items:center;gap:4px;padding:4px;border-radius:10px;border:2px solid transparent}
+.rowline .card{pointer-events:none}
+.rowline.ok{border-color:var(--ok);background:#7ee0a814;cursor:pointer}
+.rowline.full .slot:last-of-type{border-color:var(--bad)}
+.rowline .slot{width:44px;height:62px;border-radius:6px;border:1px dashed var(--line);flex:none}
+.rowline .rp{margin-left:auto;font-weight:700;color:var(--muted);min-width:40px;text-align:right}
+.rowline.full .rp{color:var(--bad)}
+.card.md{width:44px;height:62px}
+.card .num{font-size:22px;font-weight:800}
+.card.md .num{font-size:17px}
+.card .pen{position:absolute;bottom:3px;left:0;right:0;text-align:center;font-size:11px;font-weight:700;color:#9b2d20}
+.card.md .pen{font-size:10px;bottom:2px}
+.card.p2{background:#d6e9ff}.card.p3{background:#fff0b0}.card.p5{background:#ffcfbf}.card.p7{background:#e3d0ff}
+.hand{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.reveal{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:4px 0 8px}
+.reveal .it{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.72rem;color:var(--muted);max-width:58px;overflow:hidden;white-space:nowrap}
+.reveal .it.done{opacity:.35}
+.reveal .it.cur .card{outline:3px solid var(--accent)}
+</style>
+<script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
+</head>
+<body>
+<div id="banner"></div>
+<div id="app"></div>
+<div id="toast"></div>
+<script>
+'use strict';
+// ---------- Grundlagen ----------
+// Karten sind die Zahlen 1 bis 104. Minuspunkte: 55 → 7, Schnapszahlen → 5, Zehner → 3, Fünfer → 2, sonst 1.
+const PEN = n => n === 55 ? 7 : n % 11 === 0 ? 5 : n % 10 === 0 ? 3 : n % 5 === 0 ? 2 : 1;
+const rowPen = r => r.reduce((a, n) => a + PEN(n), 0);
+const END = 66;                     // ab hier endet das Spiel nach der Runde
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const $ = s => document.querySelector(s);
+const ls = {get(k){try{return JSON.parse(localStorage.getItem(k))}catch{return null}}, set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
+const ss = {get(k){try{return sessionStorage.getItem(k)}catch{return null}}, set(k,v){try{sessionStorage.setItem(k,v)}catch{}}};
+const rid = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => 'ABCDEFGHJKLMNPQRSTUVWXYZ'[b % 24]).join('');
+const params = new URLSearchParams(location.search);
+let token = ss.get('vr-token'); if (!token) { token = rid(12); ss.set('vr-token', token); }
+
+let joinName = '';
+let role = null, roomCode = null, mq = null, G = null, V = null, local = false;
+const soloCfg = ls.get('vr-solo') || {};
+let soloN = soloCfg.n || 3, soloLv = soloCfg.lv || 'uebel', soloT = soloCfg.t || 0;
+const saveSolo = () => ls.set('vr-solo', {n:soloN, lv:soloLv, t:soloT});
+let lastTurn = null, joinTimer = null, awaitingView = false, stopped = false;
+
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove('on'),2800); }
+function banner(msg){ const b=$('#banner'); b.textContent=msg; b.style.display=msg?'block':'none'; }
+function myName(){ return (ls.get('sh-name')||'').trim().slice(0,16); }
+function shareLink(){ return location.origin + location.pathname + '?room=' + roomCode; }
+
+// ---------- Spiellogik (läuft nur beim Gastgeber) ----------
+// Phasen: lobby → pick (alle wählen verdeckt) → resolve (Karten werden aufsteigend angelegt) → pick … → over.
+function newGame(){ return {phase:'lobby', players:[], rows:[], log:[], round:0, trick:0, picks:{}, queue:null, qi:0, choose:null, played:[], final:false}; }
+function mkPlayer(name, tok, bot){ return {name, token:tok, bot:bot || null, hand:[], taken:[], connected:true, total:0, score:null}; }
+function log(msg){ G.seq = (G.seq || 0) + 1; G.log.push(msg); if (G.log.length > 30) G.log.shift(); }
+function shuffle(a){ for (let i=a.length-1;i>0;i--){ const j=crypto.getRandomValues(new Uint32Array(1))[0]%(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+function deal(){
+  G.players = G.players.filter((p,i) => i === 0 || p.connected);
+  if (G.final || G.phase === 'lobby'){ G.players.forEach(p => p.total = 0); G.round = 0; G.final = false; }
+  const d = shuffle(Array.from({length:104}, (_, k) => k + 1));
+  G.players.forEach(p => { p.hand = d.splice(0, 10).sort((a,b) => a - b); p.taken = []; p.score = null; });
+  G.rows = d.splice(0, 4).map(n => [n]);
+  G.round++; G.trick = 0; G.picks = {}; G.queue = null; G.qi = 0; G.choose = null; G.last = null;
+  G.played = G.rows.flat();            // alles, was offen auf dem Tisch war (Bots zählen mit)
+  G.phase = 'pick';
+  log(`Runde ${G.round}. Alle wählen verdeckt eine Karte.`);
+}
+const allPicked = () => G.players.every((p,i) => G.picks[i] != null);
+const lastOf = r => r[r.length - 1];
+function rowFor(n){
+  let best = -1;
+  G.rows.forEach((r,k) => { if (lastOf(r) < n && (best < 0 || lastOf(r) > lastOf(G.rows[best]))) best = k; });
+  return best;
+}
+function cheapestRow(){
+  let b = 0;
+  G.rows.forEach((r,k) => { const a = rowPen(r), c = rowPen(G.rows[b]); if (a < c || (a === c && r.length < G.rows[b].length)) b = k; });
+  return b;
+}
+function beginResolve(){
+  G.queue = G.players.map((p,i) => ({p:i, n:G.picks[i]})).sort((a,b) => a.n - b.n);
+  G.queue.forEach(x => { const h = G.players[x.p].hand; h.splice(h.indexOf(x.n), 1); G.played.push(x.n); });
+  G.qi = 0; G.picks = {}; G.phase = 'resolve';
+  log('Aufgedeckt: ' + G.queue.map(x => `${G.players[x.p].name} ${x.n}`).join(', ') + '.');
+}
+function takeRow(i, k, n){
+  const r = G.rows[k], pts = rowPen(r);
+  G.players[i].taken.push(...r); G.rows[k] = [n];
+  return pts;
+}
+function resolveStep(){
+  if (G.phase !== 'resolve' || G.choose) return;
+  const x = G.queue[G.qi]; if (!x) return endTrick();
+  const p = G.players[x.p], k = rowFor(x.n);
+  if (k < 0){ G.choose = {p:x.p, n:x.n}; log(`${p.name}: ${x.n} ist kleiner als alle Reihen, ${p.name} nimmt eine Reihe.`); return; }
+  if (G.rows[k].length >= 5){ const pts = takeRow(x.p, k, x.n); log(`${p.name} legt ${x.n} als sechste Karte und nimmt Reihe ${k+1}: −${pts}.`); }
+  else { G.rows[k].push(x.n); log(`${p.name} legt ${x.n} an Reihe ${k+1}.`); }
+  G.qi++; if (G.qi >= G.queue.length) endTrick();
+}
+function chooseRow(k){
+  const c = G.choose, p = G.players[c.p];
+  const pts = takeRow(c.p, k, c.n); G.choose = null;
+  log(`${p.name} nimmt Reihe ${k+1} (−${pts}), die ${c.n} beginnt sie neu.`);
+  G.qi++; if (G.qi >= G.queue.length) endTrick();
+}
+function endTrick(){
+  G.last = G.queue; G.queue = null; G.qi = 0; G.trick++;
+  if (G.players.every(p => !p.hand.length)) return endRound();
+  G.phase = 'pick';
+}
+function endRound(){
+  G.players.forEach(p => { p.score = rowPen(p.taken); p.total += p.score; });
+  G.phase = 'over';
+  const min = Math.min(...G.players.map(p => p.score));
+  log(`Runde ${G.round} vorbei. Am wenigsten: ${G.players.filter(p => p.score === min).map(p => p.name).join(' und ')} mit −${min}.`);
+  if (G.players.some(p => p.total >= END)){
+    G.final = true;
+    const best = Math.min(...G.players.map(p => p.total));
+    log(`Spielende. ${G.players.filter(p => p.total === best).map(p => p.name).join(' und ')} gewinnt mit −${best}.`);
+  }
+}
+
+function apply(i, m){
+  const p = G.players[i];
+  switch (m.type){
+    case 'addbot':
+      if (i !== 0) return;
+      if (G.phase !== 'lobby' && G.phase !== 'over') return 'Bots kommen nur zwischen den Runden dazu.';
+      return addBot(m.level);
+    case 'kickbot':
+      if (i !== 0 || (G.phase !== 'lobby' && G.phase !== 'over')) return;
+      kickBot(+m.idx); return;
+    case 'limit':
+      if (i !== 0 || (G.phase !== 'lobby' && G.phase !== 'over')) return;
+      G.limit = setLimit(m.s); log(`Zeitlimit: ${limTxt(G.limit)}.`); return;
+    case 'start':
+      if (i !== 0) return 'Nur der Gastgeber teilt aus.';
+      if (G.phase !== 'lobby' && G.phase !== 'over') return;
+      if (G.players.filter((q,k) => k === 0 || q.connected).length < 2) return 'Mindestens zwei Spieler.';
+      deal(); return;
+    case 'skip':
+      if (i !== 0) return;
+      if (G.phase === 'pick'){
+        G.players.forEach((q,k) => { if (!q.connected && !q.bot && G.picks[k] == null) G.picks[k] = rnd(q.hand); });
+        if (allPicked()) beginResolve();
+        return;
+      }
+      if (G.phase === 'resolve' && G.choose && !G.players[G.choose.p].connected) chooseRow(cheapestRow());
+      return;
+    case 'pick':
+      if (G.phase !== 'pick') return 'Gerade nicht.';
+      if (!p.hand.includes(+m.n)) return 'Die Karte hast du nicht.';
+      G.picks[i] = +m.n;
+      if (allPicked()) beginResolve();
+      return;
+    case 'row':
+      if (G.phase !== 'resolve' || !G.choose || G.choose.p !== i) return 'Gerade nicht.';
+      if (!G.rows[+m.k]) return 'Ungültige Reihe.';
+      chooseRow(+m.k); return;
+  }
+  return 'Unbekannte Aktion.';
+}
+
+function view(i){
+  const me = G.players[i];
+  return {
+    phase:G.phase, me:i, code:roomCode, log:G.log.slice(-4), round:G.round, trick:G.trick, final:G.final, end:END,
+    rows:G.rows, hand:me.hand, mypick:G.picks[i] ?? null,
+    players:G.players.map((p,k) => ({name:p.name, bot:p.bot, connected:p.connected, hand:p.hand.length, picked:G.picks[k] != null, pen:rowPen(p.taken), total:p.total, score:p.score})),
+    reveal:G.queue ? G.queue.map((x,k) => ({p:x.p, n:x.n, done:k < G.qi})) : null, qi:G.qi,
+    choose:G.choose ? {p:G.choose.p, n:G.choose.n} : null,
+    limit:G.limit || 0, left:G.deadline ? Math.max(0, G.deadline - Date.now()) : null
+  };
+}
+// Das Anlegen läuft Karte für Karte mit kurzer Pause, damit alle sehen, was passiert.
+let stepTimer = null;
+function armStep(){
+  clearTimeout(stepTimer);
+  if (role !== 'host' || !G || G.phase !== 'resolve' || G.choose) return;
+  stepTimer = setTimeout(() => { resolveStep(); broadcast(); }, G.qi === 0 ? 1500 : 1000);
+}
+function broadcast(){
+  armTimer();
+  G.players.forEach((p,i) => {
+    if (i === 0){ V = view(0); render(); return; }
+    if (!p.bot) pub('p/' + p.token, {type:'view', view:view(i)});
+  });
+  ls.set('vr-host', {code:roomCode, G, t:Date.now(), local});
+  scheduleBots();
+  armStep();
+}
+function tell(i, msg){
+  if (i === 0) return toast(msg);
+  if (!G.players[i].bot) pub('p/' + G.players[i].token, {type:'error', msg});
+}
+function act(i, m){ const err = apply(i, m); if (err) tell(i, err); broadcast(); }
+
+// ---------- Bots: Spielweise Volle Reihe ----------
+// Hart: legt die Karte, die am knappsten an ein Reihenende passt, oft auch einfach irgendeine.
+// Übel: schätzt für jede Karte, wie wahrscheinlich sie die sechste wird und was das kostet.
+// Crazy: wie Übel, zählt aber jede gespielte Karte mit und rechnet mit dem, was wirklich noch im Spiel ist.
+const comb = (n, k) => { let r = 1; for (let j = 1; j <= k; j++) r = r * (n - k + j) / j; return r; };
+function atLeast(n, p, k){ if (k <= 0) return 1; if (k > n) return 0; let s = 0; for (let j = k; j <= n; j++) s += comb(n, j) * p ** j * (1 - p) ** (n - j); return s; }
+function cardCost(i, n, lv){
+  const k = rowFor(n), others = G.players.length - 1;
+  if (k < 0) return Math.min(...G.rows.map(rowPen)) + 0.3;      // zu klein: billigste Reihe nehmen
+  const row = G.rows[k], need = 5 - row.length;
+  if (need <= 0) return rowPen(row) + 0.5;                       // sicher die sechste
+  const e = lastOf(row);
+  let pr;
+  if (lv === 'crazy'){
+    const seen = new Set([...G.played, ...G.players[i].hand]);
+    let u = 0, g = 0;
+    for (let c = 1; c <= 104; c++) if (!seen.has(c)){ u++; if (c > e && c < n) g++; }
+    pr = u ? g / u : 0;
+  } else pr = Math.min(1, (n - e - 1) / 90);
+  return atLeast(others, pr, need) * (rowPen(row) + need * 1.3);
+}
+function botPick(i){
+  const p = G.players[i], lv = p.bot, h = p.hand;
+  if (lv === 'hart'){
+    if (Math.random() < 0.35) return rnd(h);
+    let best = null, bg = 999;
+    for (const n of h){ const k = rowFor(n); if (k < 0 || G.rows[k].length >= 5) continue; const g = n - lastOf(G.rows[k]); if (g < bg){ bg = g; best = n; } }
+    return best ?? h[0];
+  }
+  if (lv === 'crazy') return mcPick(i);
+  let best = h[0], bc = Infinity;
+  for (const n of h){
+    const c = cardCost(i, n, lv) + Math.random() * 0.4;
+    if (c < bc){ bc = c; best = n; }
+  }
+  return best;
+}
+// Crazy spielt jeden Kandidaten 120-mal mit zufälligen Gegnerkarten aus dem, was noch im Spiel ist, durch.
+function mcPick(i){
+  const h = G.players[i].hand, others = G.players.length - 1;
+  const seen = new Set([...G.played, ...h]);
+  const pool = []; for (let c = 1; c <= 104; c++) if (!seen.has(c)) pool.push(c);
+  const S = 120, cost = new Map(h.map(n => [n, 0]));
+  for (let s = 0; s < S; s++){
+    const opp = [];
+    for (let k = 0; k < others && pool.length; k++){ let c; do { c = pool[Math.floor(Math.random() * pool.length)]; } while (opp.includes(c)); opp.push(c); }
+    for (const n of h) cost.set(n, cost.get(n) + simTrick(n, opp));
+  }
+  // Gleichstand: lieber hohe Karten loswerden, die später gefährlicher werden
+  let best = h[0], bc = Infinity;
+  for (const n of h){ const c = cost.get(n) / S - n * 0.0005; if (c < bc){ bc = c; best = n; } }
+  return best;
+}
+function simTrick(mine, opp){
+  const rows = G.rows.map(r => ({last:lastOf(r), len:r.length, pen:rowPen(r)}));
+  let my = 0;
+  for (const c of [mine, ...opp].sort((a,b) => a - b)){
+    let k = -1;
+    rows.forEach((r,j) => { if (r.last < c && (k < 0 || r.last > rows[k].last)) k = j; });
+    let take = 0;
+    if (k < 0){ k = 0; rows.forEach((r,j) => { if (r.pen < rows[k].pen) k = j; }); take = rows[k].pen; rows[k] = {last:c, len:1, pen:PEN(c)}; }
+    else if (rows[k].len >= 5){ take = rows[k].pen; rows[k] = {last:c, len:1, pen:PEN(c)}; }
+    else { rows[k] = {last:c, len:rows[k].len + 1, pen:rows[k].pen + PEN(c)}; }
+    if (c === mine) my += take;
+  }
+  return my;
+}
+function botPlan(){
+  const P = G.players, c = [];
+  if (G.phase === 'pick') P.forEach((p,i) => { if (p.bot && G.picks[i] == null) c.push({i, m:{type:'pick', n:botPick(i)}, delay:600 + 300 * (i % 4)}); });
+  if (G.phase === 'resolve' && G.choose && P[G.choose.p].bot){
+    const b = P[G.choose.p].bot;
+    c.push({i:G.choose.p, m:{type:'row', k: b === 'hart' && Math.random() < 0.3 ? Math.floor(Math.random() * 4) : cheapestRow()}, delay:1100});
+  }
+  return c;
+}
+function botFallback(i){
+  if (G.phase === 'pick' && G.picks[i] == null) return {type:'pick', n:G.players[i].hand[0]};
+  if (G.phase === 'resolve' && G.choose && G.choose.p === i) return {type:'row', k:0};
+  return null;
+}
+
+// ---------- Bots (gemeinsamer Rahmen) ----------
+// Bots sitzen beim Gastgeber und spielen über dieselbe apply()-Schnittstelle wie Menschen.
+const BOT_NAMES = ['Horst','Gisela','Rudi','Uschi','Klaus','Bärbel','Detlef','Inge','Waltraud','Kalle'];
+const LEVELS = {hart:'Hart', uebel:'Übel', crazy:'Crazy'};
+let botTimer = null;
+const botFails = new Set(), rolls = new Map();
+const roll = k => { if (!rolls.has(k)) rolls.set(k, Math.random()); return rolls.get(k); };
+const rnd = a => a[Math.floor(Math.random() * a.length)];
+function addBot(level){
+  if (!LEVELS[level]) return;
+  if (G.players.length >= 8) return 'Der Tisch ist voll (8 Leute).';
+  const used = new Set(G.players.map(p => p.name));
+  const name = BOT_NAMES.find(n => !used.has(n)) || 'Bot ' + G.players.length;
+  G.players.push(mkPlayer(name, 'bot-' + rid(8), level));
+  log(`${name} (Bot, ${LEVELS[level]}) setzt sich dazu.`);
+}
+function kickBot(k){
+  const p = G.players[k]; if (!p || !p.bot) return;
+  G.players.splice(k, 1); log(`${p.name} steht auf.`);
+  if (G.finish) G.finish = G.finish.filter(x => x !== k).map(x => x > k ? x - 1 : x);
+  if (G.loser != null) G.loser = G.loser === k ? null : G.loser > k ? G.loser - 1 : G.loser;
+}
+const failKey = (i, m) => (G.seq || 0) + '|' + i + '|' + JSON.stringify(m);
+function scheduleBots(){
+  clearTimeout(botTimer);
+  if (role !== 'host' || !G || !G.players.some(p => p.bot)) return;
+  const all = botPlan().filter(x => x && x.m && !botFails.has(failKey(x.i, x.m))).sort((a,b) => a.delay - b.delay);
+  const plan = all[0]; if (!plan) return;
+  botTimer = setTimeout(() => botAct(plan), plan.delay);
+}
+function botAct(plan){
+  const err = apply(plan.i, plan.m);
+  if (err){
+    console.warn('Bot-Zug abgelehnt:', G.players[plan.i] && G.players[plan.i].name, plan.m, err);
+    botFails.add(failKey(plan.i, plan.m));
+    const fb = botFallback(plan.i); if (fb) apply(plan.i, fb);
+  }
+  broadcast();
+}
+function startSolo(){
+  startHost('SOLO', null, true);
+  for (let k = 0; k < soloN; k++) addBot(soloLv);
+  G.limit = soloT; deal(); broadcast();
+}
+function botBar(){
+  const full = V.players.length >= 8;
+  return `<div class="botbar"><span class="muted">Bot dazu:</span>${Object.entries(LEVELS).map(([k,v]) => `<button class="small-btn" data-act="addbot" data-level="${k}" ${full ? 'disabled' : ''}>${v}</button>`).join('')}</div>`;
+}
+
+// ---------- Zeitlimit: Volle Reihe ----------
+function timerKey(){
+  if (G.phase === 'pick') return G.players.some((q,k) => human(k) && G.picks[k] == null) ? 'pick:' + G.round + ':' + G.trick : null;
+  if (G.phase === 'resolve' && G.choose) return human(G.choose.p) ? 'row:' + G.round + ':' + G.trick + ':' + G.qi : null;
+  return null;
+}
+function timeUp(){
+  if (G.phase === 'pick'){
+    G.players.forEach((q,k) => { if (human(k) && G.picks[k] == null){ G.picks[k] = rnd(q.hand); log(`${q.name}: Zeit abgelaufen, eine zufällige Karte.`); } });
+    if (allPicked()) beginResolve();
+    return;
+  }
+  if (G.phase === 'resolve' && G.choose){ log(`${G.players[G.choose.p].name}: Zeit abgelaufen.`); chooseRow(cheapestRow()); }
+}
+
+// ---------- Zeitlimit ----------
+// G.limit Sekunden pro Zug (0 = aus), nur Menschen. Der Gastgeber hält die Uhr; Mitspieler bekommen die Restzeit,
+// nicht die Uhrzeit, damit falsch gehende Handyuhren nichts ausmachen. Läuft sie ab, zieht timeUp() für den Spieler.
+let turnTimer = null;
+const human = i => G.players[i] && !G.players[i].bot;
+function armTimer(){
+  clearTimeout(turnTimer);
+  if (role !== 'host' || !G) return;
+  const k = G.limit ? timerKey() : null;
+  if (!k){ G.tkey = null; G.deadline = null; return; }
+  if (k !== G.tkey){ G.tkey = k; G.deadline = Date.now() + G.limit * 1000; }
+  turnTimer = setTimeout(onTimeout, Math.max(0, G.deadline - Date.now()) + 60);
+}
+function onTimeout(){
+  if (!G || !G.limit || !G.tkey || timerKey() !== G.tkey) return;
+  timeUp(); G.tkey = null; broadcast();
+}
+function setLimit(s){ s = Math.round(+s / 5) * 5; return Number.isFinite(s) ? Math.min(60, Math.max(0, s)) : 0; }
+const limTxt = s => s ? s + ' s pro Zug' : 'aus';
+function limitHTML(host, val, solo){
+  const v = val ?? (V ? V.limit : 0);
+  if (!host) return `<p class="muted" style="margin:10px 0 0">Zeitlimit: ${limTxt(v)}</p>`;
+  return `<div class="limit"><div class="zone-label">Zeitlimit <b data-limv>${limTxt(v)}</b></div>
+    <input type="range" min="0" max="60" step="5" value="${v}" data-limit="${solo ? 'solo' : 'room'}" aria-label="Zeitlimit in Sekunden"></div>`;
+}
+function timerHTML(){
+  if (!V || !V.limit || V.until == null) return '';
+  const ms = Math.max(0, V.until - Date.now());
+  return `<div class="timer${ms <= 5000 ? ' low' : ''}"><i style="width:${100 * ms / (V.limit * 1000)}%"></i><span>Zeit ${Math.ceil(ms / 1000)} s</span></div>`;
+}
+setInterval(() => {
+  if (!V || !V.limit || V.until == null) return;
+  const ms = Math.max(0, V.until - Date.now());
+  document.querySelectorAll('.timer').forEach(el => {
+    el.querySelector('i').style.width = (100 * ms / (V.limit * 1000)) + '%';
+    el.querySelector('span').textContent = 'Zeit ' + Math.ceil(ms / 1000) + ' s';
+    el.classList.toggle('low', ms <= 5000);
+  });
+}, 200);
+document.addEventListener('input', e => {
+  const t = e.target; if (!t.dataset || !t.dataset.limit) return;
+  const l = t.closest('.limit').querySelector('[data-limv]'); if (l) l.textContent = limTxt(setLimit(t.value));
+});
+document.addEventListener('change', e => {
+  const t = e.target; if (!t.dataset || !t.dataset.limit) return;
+  if (t.dataset.limit === 'solo'){ keepName(); soloT = setLimit(t.value); saveSolo(); }
+  else send({type:'limit', s:setLimit(t.value)});
+});
+
+// ---------- Netzwerk (wie Shithead: öffentlicher MQTT-Server) ----------
+const BROKER = 'wss://broker.hivemq.com:8884/mqtt';
+const TOPIC = 'reihe-gx7/';
+const T = sub => TOPIC + roomCode + '/' + sub;
+function pub(sub, obj){ if (local) return; if (mq && mq.connected) mq.publish(T(sub), JSON.stringify(obj), {qos:1}); }
+function mqConnect(will, onConnect, onMsg){
+  mq = mqtt.connect(BROKER, {clientId:'vr_' + rid(12), keepalive:15, reconnectPeriod:2000, connectTimeout:10000, clean:true, will});
+  mq.on('connect', () => { banner(''); onConnect(); });
+  mq.on('reconnect', () => { if (!stopped) banner('Verbindung weg, verbinde neu …'); });
+  mq.on('offline', () => { if (!stopped) banner('Keine Verbindung, verbinde neu …'); });
+  mq.on('message', (topic, buf) => { let m; try { m = JSON.parse(buf.toString()); } catch { return; } if (m && typeof m === 'object') onMsg(topic, m); });
+}
+function startHost(code, saved, isLocal){
+  role = 'host'; roomCode = code; local = !!isLocal; G = saved || newGame();
+  if (!saved) G.players.push(mkPlayer(myName() || 'Du', token));
+  else { G.players.forEach((p,i) => p.connected = i === 0 || !!p.bot); G.players[0].token = token; G.tkey = null; }
+  if (local){ broadcast(); return; }
+  $('#app').innerHTML = '<div class="panel">Erstelle Raum …</div>';
+  mqConnect({topic:T('all'), payload:JSON.stringify({type:'hostgone'}), qos:1, retain:false},
+    () => mq.subscribe(T('h'), {qos:1}, () => { pub('all', {type:'hostback'}); broadcast(); }),
+    (topic, m) => onHostData(m));
+}
+function onHostData(m){
+  const tok = typeof m.from === 'string' ? m.from : null; if (!tok) return;
+  if (m.type === 'join'){
+    const name = String(m.name || '').trim().slice(0,16) || 'Gast';
+    let i = G.players.findIndex((p,k) => k > 0 && p.token === tok);
+    if (i < 0 && G.phase !== 'lobby') i = G.players.findIndex((p,k) => k > 0 && !p.connected && p.name.toLowerCase() === name.toLowerCase());
+    if (i < 0){
+      if (G.phase !== 'lobby') return pub('p/' + tok, {type:'fatal', msg:'Hier läuft gerade eine Runde. Steig ein, wenn die nächste beginnt: Seite dann neu laden.'});
+      if (G.players.length >= 8) return pub('p/' + tok, {type:'fatal', msg:'Der Tisch ist voll (8 Leute).'});
+      G.players.push(mkPlayer(name, tok)); log(`${name} ist da.`);
+    } else {
+      const p = G.players[i];
+      if (!p.connected) log(`${p.name} ist wieder da.`);
+      p.token = tok; p.connected = true;
+    }
+    broadcast(); return;
+  }
+  const i = G.players.findIndex((p,k) => k > 0 && p.token === tok);
+  if (i < 0) return;
+  const p = G.players[i];
+  if (m.type === 'bye'){
+    if (G.phase === 'lobby'){ G.players.splice(i, 1); log(`${p.name} ist gegangen.`); }
+    else if (p.connected){ p.connected = false; log(`${p.name} hat die Verbindung verloren.`); }
+    broadcast(); return;
+  }
+  if (!p.connected){ p.connected = true; log(`${p.name} ist wieder da.`); }
+  act(i, m);
+}
+function startClient(code){
+  joinName = myName(); role = 'client'; roomCode = code.toUpperCase();
+  $('#app').innerHTML = `<div class="panel">Verbinde mit Raum ${esc(roomCode)} …</div>`;
+  mqConnect({topic:T('h'), payload:JSON.stringify({type:'bye', from:token}), qos:1, retain:false},
+    () => mq.subscribe([T('p/' + token), T('all')], {qos:1}, () => sendJoin()),
+    (topic, m) => {
+      if (stopped) return;
+      if (topic === T('all')){
+        if (m.type === 'hostgone') banner('Der Gastgeber ist gerade weg. Sobald er zurück ist, geht es weiter.');
+        else if (m.type === 'hostback'){ banner(''); sendJoin(); }
+        return;
+      }
+      if (m.type === 'view'){ awaitingView = false; banner(''); V = m.view; render(); }
+      else if (m.type === 'error') toast(m.msg);
+      else if (m.type === 'fatal'){ stopped = true; clearTimeout(joinTimer); mq.end(); banner(''); $('#app').innerHTML = `<div class="panel"><b>${esc(m.msg)}</b></div>`; }
+    });
+}
+function sendJoin(){
+  if (stopped) return;
+  awaitingView = true;
+  pub('h', {type:'join', name:joinName, from:token});
+  clearTimeout(joinTimer);
+  joinTimer = setTimeout(() => {
+    if (!awaitingView || stopped) return;
+    if (!V) $('#app').innerHTML = `<div class="panel"><b>Raum ${esc(roomCode)} antwortet nicht.</b><p class="muted">Ich versuche es weiter. Läuft das Spiel beim Gastgeber, und ist der Code richtig?</p><a class="btn wide" href="${esc(location.pathname)}">Zurück</a></div>`;
+    else banner('Der Gastgeber antwortet nicht, versuche weiter …');
+    sendJoin();
+  }, 6000);
+}
+function send(m){
+  if (role === 'host') return act(0, m);
+  if (mq && mq.connected) pub('h', {...m, from:token}); else toast('Nicht verbunden.');
+}
+window.addEventListener('pagehide', () => { if (role === 'client') pub('h', {type:'bye', from:token}); });
+
+// ---------- Oberfläche ----------
+const RULES = `<details><summary>Spielregeln</summary><ul>
+<li><b>Ziel:</b> möglichst wenige Minuspunkte. Hat nach einer Runde jemand ${END} oder mehr, ist Schluss; die wenigsten Minuspunkte gewinnen.</li>
+<li><b>Karten:</b> 1 bis 104. Jede kostet Minuspunkte, die unten auf der Karte stehen: meist 1, Fünfer 2, Zehner 3, Schnapszahlen 5, die 55 sogar 7. Die Farbe zeigt es auf einen Blick.</li>
+<li><b>Start:</b> Jeder bekommt 10 Karten, 4 Karten liegen offen und beginnen 4 Reihen.</li>
+<li><b>Zug:</b> Alle wählen gleichzeitig verdeckt eine Karte. Haben alle gewählt, wird aufgedeckt und von der kleinsten zur größten angelegt.</li>
+<li><b>Anlegen:</b> Jede Karte kommt an die Reihe, deren letzte Karte am nächsten darunter liegt.</li>
+<li><b>Sechste Karte:</b> Wer an eine volle Reihe mit fünf Karten anlegen muss, nimmt die fünf; seine Karte beginnt die Reihe neu.</li>
+<li><b>Zu klein:</b> Ist deine Karte kleiner als alle Reihenenden, nimmst du eine Reihe deiner Wahl, und deine Karte beginnt sie neu.</li>
+<li>Nach 10 Zügen werden die genommenen Minuspunkte gezählt und über die Runden addiert.</li></ul></details>`;
+
+function cardHTML(n, o = {}){
+  const p = PEN(n), cls = ['card', 'p' + p, o.size || '', o.extra || ''].join(' ');
+  const attr = o.act ? `data-act="${o.act}" data-n="${n}"` : 'disabled';
+  return `<button class="${cls}" ${attr} aria-label="Karte ${n}, ${p} Minuspunkte"><span class="num">${n}</span><span class="pen">−${p}</span></button>`;
+}
+function header(){
+  if (local) return `<header><b>Volle Reihe</b><span class="muted">gegen ${V.players.length - 1} Bots</span><span class="sp"></span><button class="small-btn" data-act="quit">Beenden</button></header>`;
+  return `<header><b>Volle Reihe</b><span class="muted">Raum ${esc(V.code)}</span><span class="sp"></span><button class="small-btn" data-act="share">Link teilen</button></header>`;
+}
+function render(){
+  if (!V) return renderStart();
+  if (V.left != null && V.until == null) V.until = Date.now() + V.left;
+  const myMove = (V.phase === 'pick' && V.mypick == null) || !!(V.choose && V.choose.p === V.me);
+  if (myMove && lastTurn !== true){ try { navigator.vibrate && navigator.vibrate(120); } catch {} }
+  lastTurn = myMove;
+  document.title = myMove ? '▶ Du bist dran – Volle Reihe' : 'Volle Reihe';
+  $('#app').innerHTML = header() + (V.phase === 'lobby' ? lobbyHTML() : gameHTML(myMove));
+}
+function lobbyHTML(){
+  const host = V.me === 0;
+  return `<div class="panel" style="text-align:center">
+    <div class="muted">Raumcode</div><div class="code">${esc(V.code)}</div>
+    <p class="muted">Schick den Link an deine Leute. Wer ihn öffnet, sitzt mit am Tisch.</p>
+    <button class="btn wide" data-act="share">Link teilen oder kopieren</button></div>
+  <div class="panel"><b>Am Tisch (${V.players.length}/8)</b>
+    <ul class="plist">${V.players.map((p,k) => `<li>${esc(p.name)}${k === 0 ? ' <span class="muted">(Gastgeber)</span>' : ''}${k === V.me ? ' <span class="tag">du</span>' : ''}${p.bot ? ` <span class="tag">Bot · ${LEVELS[p.bot]}</span>${host ? ` <button class="small-btn" data-act="kickbot" data-idx="${k}">entfernen</button>` : ''}` : ''}</li>`).join('')}</ul>
+    ${host ? botBar() : ''}
+    ${limitHTML(host)}
+    ${host ? `<button class="btn primary wide" data-act="start" ${V.players.length < 2 ? 'disabled' : ''}>Austeilen</button>${V.players.length < 2 ? '<p class="muted">Warte auf Mitspieler oder nimm einen Bot dazu.</p>' : ''}`
+           : '<p class="muted">Warte, bis der Gastgeber austeilt.</p>'}
+    ${RULES}</div>`;
+}
+
+function gameHTML(myMove){
+  const me = V.players[V.me], n = V.players.length, host = V.me === 0;
+  const myChoose = !!(V.choose && V.choose.p === V.me);
+
+  let opps = '';
+  for (let k = 1; k < n; k++){
+    const q = (V.me + k) % n, p = V.players[q];
+    const choosing = V.choose && V.choose.p === q, thinking = V.phase === 'pick' && !p.picked;
+    const st = !p.connected ? '<span class="tag" style="color:var(--bad)">offline</span>'
+      : choosing ? '<span class="tag">wählt Reihe</span>'
+      : V.phase === 'pick' ? (p.picked ? '<span class="tag">gewählt</span>' : '<span class="tag" style="color:var(--muted)">überlegt</span>') : '';
+    opps += `<div class="opp ${choosing || thinking ? 'turn' : ''}"><div class="nm">${esc(p.name)} ${st}</div>${p.bot ? `<div class="cnt">Bot · ${LEVELS[p.bot]}</div>` : ''}
+      <div class="cnt">${p.hand} Karten · −${p.pen}${p.total ? ' · ges. −' + p.total : ''}</div></div>`;
+  }
+
+  const rows = V.rows.map((r, k) => {
+    const slots = Array.from({length:5}, (_, s) => r[s] != null ? cardHTML(r[s], {size:'md'}) : '<div class="slot"></div>').join('');
+    return `<div class="rowline${myChoose ? ' ok' : ''}${r.length >= 5 ? ' full' : ''}" ${myChoose ? `data-act="row" data-k="${k}" role="button" aria-label="Reihe ${k+1} nehmen"` : ''}>${slots}<span class="rp">−${rowPen(r)}</span></div>`;
+  }).join('');
+  const strip = V.reveal ? `<div class="reveal">${V.reveal.map((x, k) => `<div class="it${x.done ? ' done' : k === V.qi ? ' cur' : ''}">${cardHTML(x.n, {size:'md'})}<span>${esc(V.players[x.p].name)}</span></div>`).join('')}</div>` : '';
+  const center = `<div class="rows">${rows}</div>${strip}<div class="log">${V.log.map(l => `<div>${esc(l)}</div>`).join('')}</div>`;
+
+  const canPick = V.phase === 'pick';
+  const hand = V.hand.map(c => cardHTML(c, {act: canPick ? 'pick' : null, extra: V.mypick === c ? 'pick' : ''})).join('');
+  const mine = `<div class="mine ${myMove ? 'myturn' : ''}"><div class="zone-label">Deine Karten · −${me.pen} diese Runde${me.total ? ' · ges. −' + me.total : ''}</div>
+    <div class="hand">${hand || '<span class="muted">keine mehr</span>'}</div></div>`;
+
+  let actions = '';
+  if (V.phase === 'pick'){
+    const wait = V.players.filter(p => !p.picked).map(p => p.name);
+    actions = V.mypick == null
+      ? `<div class="big">Wähle eine Karte.</div><div class="hint">Alle wählen gleichzeitig. Aufgedeckt wird, sobald alle gewählt haben.</div>`
+      : `<div class="big">Gewählt: ${V.mypick}</div><div class="hint">Warte auf ${esc(wait.join(', '))}. Tippe eine andere Karte, um umzuwählen.</div>`;
+    if (host && V.players.some(p => !p.connected && !p.picked)) actions += `<button class="btn" data-act="skip">Für Offline-Spieler eine Karte legen</button>`;
+  } else if (V.phase === 'resolve'){
+    if (myChoose) actions = `<div class="big">Deine ${V.choose.n} ist kleiner als alle Reihen.</div><div class="hint">Tippe die Reihe, die du nimmst. Deine Karte beginnt sie neu.</div>`;
+    else if (V.choose){
+      const c = V.players[V.choose.p];
+      actions = `<div class="hint">${esc(c.name)} muss eine Reihe nehmen …</div>`;
+      if (host && !c.connected) actions += `<button class="btn" data-act="skip">Für ${esc(c.name)} die billigste Reihe nehmen</button>`;
+    } else actions = `<div class="hint">Die Karten werden angelegt …</div>`;
+  } else if (V.phase === 'over'){
+    const min = Math.min(...V.players.map(p => p.score)), best = Math.min(...V.players.map(p => p.total));
+    const res = [...V.players].sort((a,b) => a.total - b.total).map(p => `<tr><td><b>${esc(p.name)}</b>${V.final && p.total === best ? ' <span class="tag">Sieg</span>' : !V.final && p.score === min ? ' <span class="tag">beste Runde</span>' : ''}</td>
+      <td style="text-align:right">−${p.score}</td><td style="text-align:right"><b>−${p.total}</b></td></tr>`).join('');
+    actions = `<div class="panel" style="width:100%"><div class="big">${V.final ? 'Spielende' : 'Runde ' + V.round + ' vorbei'}</div>
+      <table class="res"><tr><td class="muted">Name</td><td class="muted" style="text-align:right">Runde</td><td class="muted" style="text-align:right">Gesamt</td></tr>${res}</table>
+      ${V.final ? '' : `<p class="muted">Bei ${V.end} Minuspunkten ist Schluss.</p>`}
+      ${host ? `<button class="btn primary wide" data-act="start">${V.final ? 'Neues Spiel' : 'Nächste Runde'}</button>` + botBar() + limitHTML(true) : '<p class="muted">Warte auf den Gastgeber.</p>'}</div>`;
+  }
+  return `<div class="opps">${opps}</div>${center}${mine}<div class="actions">${timerHTML()}${actions}</div>${RULES}`;
+}
+
+function renderStart(){
+  const code = (params.get('room') || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0,4);
+  const saved = ls.get('vr-host');
+  const canResume = !code && saved && saved.G && saved.G.phase !== 'lobby' && Date.now() - saved.t < 12 * 3600e3;
+  const lvDesc = {hart:'spielt nach Gefühl und verschätzt sich oft.', uebel:'rechnet mit, wie riskant jede Reihe ist.', crazy:'zählt jede gespielte Karte mit.'};
+  $('#app').innerHTML = `<div class="games"><a href="./">Shithead</a><a href="kabuki.html">Kabuki</a><a class="on" href="reihe.html">Volle Reihe</a></div>
+  <div class="panel"><h1>Volle Reihe</h1><p class="muted">Für 2 bis 8 Leute, jeder am eigenen Handy. Alle legen gleichzeitig; wer die sechste Karte an eine Reihe legt, kassiert sie. Wenige Minuspunkte gewinnen. Alleine gegen Bots oder mit Freunden.</p>
+    <label for="name">Dein Name</label><input id="name" maxlength="16" autocomplete="nickname" value="${esc(myName())}"></div>
+  ${code ? `<div class="panel"><button class="btn primary wide" data-act="join" data-code="${code}">Raum ${code} beitreten</button></div>` : `
+  <div class="panel"><b>Alleine gegen Bots</b>
+    <div class="zone-label" style="margin-top:10px">Gegner</div>
+    <div class="chips">${[1,2,3,5,7].map(n => `<button class="chip${soloN === n ? ' on' : ''}" data-act="solon" data-n="${n}">${n}</button>`).join('')}</div>
+    <div class="zone-label" style="margin-top:10px">Stärke</div>
+    <div class="chips">${Object.entries(LEVELS).map(([k,v]) => `<button class="chip${soloLv === k ? ' on' : ''}" data-act="sololv" data-lv="${k}">${v}</button>`).join('')}</div>
+    <p class="muted" style="font-size:.9rem;margin:8px 0 0">${LEVELS[soloLv]} ${lvDesc[soloLv]}</p>
+    ${limitHTML(true, soloT, true)}
+    <button class="btn primary wide" data-act="solo">Spiel starten</button></div>
+  <div class="panel"><b>Mit Freunden</b><p class="muted" style="margin:4px 0 0">Einer erstellt den Raum, die anderen öffnen den Link. Bots kann der Gastgeber im Raum dazunehmen.</p>
+    <button class="btn wide" data-act="host">Raum erstellen</button>
+    <div class="row"><input id="code" placeholder="Raumcode" maxlength="4" autocapitalize="characters"><button class="btn" data-act="joincode">Beitreten</button></div></div>`}
+  ${canResume ? `<button class="btn wide" data-act="resume">${saved.local ? 'Meine Partie gegen Bots' : 'Mein Spiel ' + esc(saved.code)} fortsetzen</button>` : ''}
+  <div class="panel">${RULES}</div>`;
+}
+function takeName(){
+  const v = ($('#name')?.value || '').trim().slice(0,16);
+  if (!v){ toast('Gib erst deinen Namen ein.'); $('#name')?.focus(); return false; }
+  ls.set('sh-name', v); return true;
+}
+
+function keepName(){ const v = ($('#name')?.value || '').trim().slice(0,16); if (v) ls.set('sh-name', v); }
+const handlers = {
+  solo(){ const v = ($('#name')?.value || '').trim().slice(0,16) || 'Du'; ls.set('sh-name', v); startSolo(); },
+  solon(t){ keepName(); soloN = +t.dataset.n; saveSolo(); renderStart(); },
+  sololv(t){ keepName(); soloLv = t.dataset.lv; saveSolo(); renderStart(); },
+  addbot(t){ send({type:'addbot', level:t.dataset.level}); },
+  kickbot(t){ send({type:'kickbot', idx:+t.dataset.idx}); },
+  quit(){ if (!confirm('Partie beenden?')) return; try { localStorage.removeItem('vr-host'); } catch {} location.href = location.pathname; },
+  host(){ if (takeName()) startHost(rid(4)); },
+  join(t){ if (takeName()) startClient(t.dataset.code); },
+  joincode(){
+    const c = ($('#code').value || '').toUpperCase().replace(/[^A-Z]/g, '');
+    if (c.length !== 4) return toast('Der Raumcode hat vier Buchstaben.');
+    if (!takeName()) return;
+    history.replaceState(null, '', '?room=' + c); startClient(c);
+  },
+  resume(){ if (!takeName()) return; const s = ls.get('vr-host'); s.G.players[0].name = myName(); startHost(s.code, s.G, s.local); },
+  async share(){
+    const url = shareLink();
+    if (navigator.share){ try { await navigator.share({title:'Volle Reihe', text:`Komm an den Tisch, Raum ${roomCode}`, url}); return; } catch {} }
+    try { await navigator.clipboard.writeText(url); toast('Link kopiert.'); } catch { prompt('Link kopieren:', url); }
+  },
+  start(){ send({type:'start'}); },
+  skip(){ send({type:'skip'}); },
+  pick(t){ send({type:'pick', n:+t.dataset.n}); },
+  row(t){ send({type:'row', k:+t.dataset.k}); }
+};
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act]'); if (!t || t.disabled) return;
+  handlers[t.dataset.act]?.(t);
+});
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && !V && e.target.id === 'code') handlers.joincode(); });
+if (typeof mqtt === 'undefined') { document.body.innerHTML = '<p style="padding:16px">Die Verbindungsbibliothek konnte nicht geladen werden. Internetverbindung prüfen und neu laden.</p>'; }
+else renderStart();
+</script>
+</body>
+</html>
