@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0f3d2e">
-<title>Volle Reihe</title>
+<title>Rindvieh</title>
 <style>
 :root{--bg:#0f3d2e;--felt:#165a43;--line:#2a7559;--ink:#f3f1e8;--muted:#a9c2b6;--card:#fffdf7;--red:#c0392b;--black:#1d1d1f;--accent:#f5c542;--ok:#7ee0a8;--bad:#e0675a;--joker:#6b3fa0}
 *{box-sizing:border-box}
@@ -104,6 +104,19 @@ details li{margin:4px 0}
 .card.md .pen{font-size:10px;bottom:2px}
 .card.p2{background:#d6e9ff}.card.p3{background:#fff0b0}.card.p5{background:#ffcfbf}.card.p7{background:#e3d0ff}
 .hand{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.card.xs{width:30px;height:42px;border-radius:5px}
+.card.xs .num{position:absolute;top:2px;left:3px;font-size:11px;line-height:1}
+.card.xs .pen{left:3px;right:auto;font-size:8px;top:15px;bottom:auto}
+.taken{width:100%;display:flex;align-items:flex-end;gap:10px;min-height:46px}
+.taken .lbl{font-size:.8rem;color:var(--muted);white-space:nowrap}
+.taken .lbl b{color:var(--bad);font-size:1rem}
+.fan{display:flex;align-items:flex-end;padding:4px 0 0 4px;overflow:hidden}
+.fan .card{margin-left:-17px;transform-origin:50% 120%;pointer-events:none}
+.fan .card:first-child{margin-left:0}
+.dragcard{touch-action:none;cursor:grab;display:inline-flex}
+.dragcard .card{pointer-events:none;outline:3px solid var(--accent)}
+.ghost{position:fixed;z-index:20;pointer-events:none;transform:translate(-50%,-60%) scale(1.1);box-shadow:0 6px 18px #0009;border-radius:7px}
+.rowline.drop{border-color:var(--accent);background:#f5c54222}
 .reveal{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:4px 0 8px}
 .reveal .it{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.72rem;color:var(--muted);max-width:58px;overflow:hidden;white-space:nowrap}
 .reveal .it.done{opacity:.35}
@@ -118,10 +131,12 @@ details li{margin:4px 0}
 <script>
 'use strict';
 // ---------- Grundlagen ----------
-// Karten sind die Zahlen 1 bis 104. Minuspunkte: 55 → 7, Schnapszahlen → 5, Zehner → 3, Fünfer → 2, sonst 1.
+// Karten sind die Zahlen 1 bis max: Spieler × 10 + 4 (+ 10/20/30 auf Wunsch), höchstens 104. Minuspunkte: 55 → 7, Schnapszahlen → 5, Zehner → 3, Fünfer → 2, sonst 1.
 const PEN = n => n === 55 ? 7 : n % 11 === 0 ? 5 : n % 10 === 0 ? 3 : n % 5 === 0 ? 2 : 1;
 const rowPen = r => r.reduce((a, n) => a + PEN(n), 0);
-const END = 66;                     // ab hier endet das Spiel nach der Runde
+const END = 66;
+const MAXC = (n, extra) => Math.min(104, n * 10 + 4 + (extra || 0));
+const EXTRAS = [0, 10, 20, 30];                     // ab hier endet das Spiel nach der Runde
 const esc = s => String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const $ = s => document.querySelector(s);
 const ls = {get(k){try{return JSON.parse(localStorage.getItem(k))}catch{return null}}, set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
@@ -133,8 +148,8 @@ let token = ss.get('vr-token'); if (!token) { token = rid(12); ss.set('vr-token'
 let joinName = '';
 let role = null, roomCode = null, mq = null, G = null, V = null, local = false;
 const soloCfg = ls.get('vr-solo') || {};
-let soloN = soloCfg.n || 3, soloLv = soloCfg.lv || 'uebel', soloT = soloCfg.t || 0;
-const saveSolo = () => ls.set('vr-solo', {n:soloN, lv:soloLv, t:soloT});
+let soloN = soloCfg.n || 3, soloLv = soloCfg.lv || 'uebel', soloT = soloCfg.t || 0, soloX = soloCfg.x || 0;
+const saveSolo = () => ls.set('vr-solo', {n:soloN, lv:soloLv, t:soloT, x:soloX});
 let lastTurn = null, joinTimer = null, awaitingView = false, stopped = false;
 
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove('on'),2800); }
@@ -152,13 +167,14 @@ function shuffle(a){ for (let i=a.length-1;i>0;i--){ const j=crypto.getRandomVal
 function deal(){
   G.players = G.players.filter((p,i) => i === 0 || p.connected);
   if (G.final || G.phase === 'lobby'){ G.players.forEach(p => p.total = 0); G.round = 0; G.final = false; }
-  const d = shuffle(Array.from({length:104}, (_, k) => k + 1));
+  G.max = MAXC(G.players.length, G.extra);
+  const d = shuffle(Array.from({length:G.max}, (_, k) => k + 1));
   G.players.forEach(p => { p.hand = d.splice(0, 10).sort((a,b) => a - b); p.taken = []; p.score = null; });
   G.rows = d.splice(0, 4).map(n => [n]);
-  G.round++; G.trick = 0; G.picks = {}; G.queue = null; G.qi = 0; G.choose = null; G.last = null;
+  G.round++; G.trick = 0; G.picks = {}; G.queue = null; G.qi = 0; G.choose = null; G.place = null; G.last = null;
   G.played = G.rows.flat();            // alles, was offen auf dem Tisch war (Bots zählen mit)
   G.phase = 'pick';
-  log(`Runde ${G.round}. Alle wählen verdeckt eine Karte.`);
+  log(`Runde ${G.round} mit den Karten 1 bis ${G.max}. Alle wählen verdeckt eine Karte.`);
 }
 const allPicked = () => G.players.every((p,i) => G.picks[i] != null);
 const lastOf = r => r[r.length - 1];
@@ -188,6 +204,12 @@ function resolveStep(){
   const x = G.queue[G.qi]; if (!x) return endTrick();
   const p = G.players[x.p], k = rowFor(x.n);
   if (k < 0){ G.choose = {p:x.p, n:x.n}; log(`${p.name}: ${x.n} ist kleiner als alle Reihen, ${p.name} nimmt eine Reihe.`); return; }
+  if (!p.bot){ G.place = {p:x.p, n:x.n, k}; return; }      // Menschen legen ihre Karte selbst an
+  placeAt(k);
+}
+function placeAt(k){
+  const x = G.queue[G.qi], p = G.players[x.p];
+  G.place = null;
   if (G.rows[k].length >= 5){ const pts = takeRow(x.p, k, x.n); log(`${p.name} legt ${x.n} als sechste Karte und nimmt Reihe ${k+1}: −${pts}.`); }
   else { G.rows[k].push(x.n); log(`${p.name} legt ${x.n} an Reihe ${k+1}.`); }
   G.qi++; if (G.qi >= G.queue.length) endTrick();
@@ -228,6 +250,9 @@ function apply(i, m){
     case 'limit':
       if (i !== 0 || (G.phase !== 'lobby' && G.phase !== 'over')) return;
       G.limit = setLimit(m.s); log(`Zeitlimit: ${limTxt(G.limit)}.`); return;
+    case 'extra':
+      if (i !== 0 || (G.phase !== 'lobby' && G.phase !== 'over')) return;
+      G.extra = EXTRAS.includes(+m.x) ? +m.x : 0; log(`Karten: ${G.extra ? '+' + G.extra : 'Grundzahl'}.`); return;
     case 'start':
       if (i !== 0) return 'Nur der Gastgeber teilt aus.';
       if (G.phase !== 'lobby' && G.phase !== 'over') return;
@@ -241,6 +266,7 @@ function apply(i, m){
         return;
       }
       if (G.phase === 'resolve' && G.choose && !G.players[G.choose.p].connected) chooseRow(cheapestRow());
+      if (G.phase === 'resolve' && G.place && !G.players[G.place.p].connected) placeAt(G.place.k);
       return;
     case 'pick':
       if (G.phase !== 'pick') return 'Gerade nicht.';
@@ -252,6 +278,12 @@ function apply(i, m){
       if (G.phase !== 'resolve' || !G.choose || G.choose.p !== i) return 'Gerade nicht.';
       if (!G.rows[+m.k]) return 'Ungültige Reihe.';
       chooseRow(+m.k); return;
+    case 'place': {
+      if (G.phase !== 'resolve' || !G.place || G.place.p !== i) return 'Gerade nicht.';
+      const k = +m.k; if (!G.rows[k]) return 'Ungültige Reihe.';
+      if (k !== G.place.k) return `Die ${G.place.n} passt nicht an Reihe ${k+1}. Sie kommt an die Reihe, deren letzte Karte am nächsten darunter liegt.`;
+      placeAt(k); return;
+    }
   }
   return 'Unbekannte Aktion.';
 }
@@ -260,10 +292,10 @@ function view(i){
   const me = G.players[i];
   return {
     phase:G.phase, me:i, code:roomCode, log:G.log.slice(-4), round:G.round, trick:G.trick, final:G.final, end:END,
-    rows:G.rows, hand:me.hand, mypick:G.picks[i] ?? null,
+    rows:G.rows, hand:me.hand, mypick:G.picks[i] ?? null, taken:me.taken, max:G.max || MAXC(G.players.length, G.extra), extra:G.extra || 0,
     players:G.players.map((p,k) => ({name:p.name, bot:p.bot, connected:p.connected, hand:p.hand.length, picked:G.picks[k] != null, pen:rowPen(p.taken), total:p.total, score:p.score})),
     reveal:G.queue ? G.queue.map((x,k) => ({p:x.p, n:x.n, done:k < G.qi})) : null, qi:G.qi,
-    choose:G.choose ? {p:G.choose.p, n:G.choose.n} : null,
+    choose:G.choose ? {p:G.choose.p, n:G.choose.n} : null, place:G.place ? {p:G.place.p, n:G.place.n} : null,
     limit:G.limit || 0, left:G.deadline ? Math.max(0, G.deadline - Date.now()) : null
   };
 }
@@ -271,7 +303,7 @@ function view(i){
 let stepTimer = null;
 function armStep(){
   clearTimeout(stepTimer);
-  if (role !== 'host' || !G || G.phase !== 'resolve' || G.choose) return;
+  if (role !== 'host' || !G || G.phase !== 'resolve' || G.choose || G.place) return;
   stepTimer = setTimeout(() => { resolveStep(); broadcast(); }, G.qi === 0 ? 1500 : 1000);
 }
 function broadcast(){
@@ -290,7 +322,7 @@ function tell(i, msg){
 }
 function act(i, m){ const err = apply(i, m); if (err) tell(i, err); broadcast(); }
 
-// ---------- Bots: Spielweise Volle Reihe ----------
+// ---------- Bots: Spielweise Rindvieh ----------
 // Hart: legt die Karte, die am knappsten an ein Reihenende passt, oft auch einfach irgendeine.
 // Übel: schätzt für jede Karte, wie wahrscheinlich sie die sechste wird und was das kostet.
 // Crazy: wie Übel, zählt aber jede gespielte Karte mit und rechnet mit dem, was wirklich noch im Spiel ist.
@@ -306,9 +338,9 @@ function cardCost(i, n, lv){
   if (lv === 'crazy'){
     const seen = new Set([...G.played, ...G.players[i].hand]);
     let u = 0, g = 0;
-    for (let c = 1; c <= 104; c++) if (!seen.has(c)){ u++; if (c > e && c < n) g++; }
+    for (let c = 1; c <= G.max; c++) if (!seen.has(c)){ u++; if (c > e && c < n) g++; }
     pr = u ? g / u : 0;
-  } else pr = Math.min(1, (n - e - 1) / 90);
+  } else pr = Math.min(1, (n - e - 1) / Math.max(10, G.max * 0.87));
   return atLeast(others, pr, need) * (rowPen(row) + need * 1.3);
 }
 function botPick(i){
@@ -331,7 +363,7 @@ function botPick(i){
 function mcPick(i){
   const h = G.players[i].hand, others = G.players.length - 1;
   const seen = new Set([...G.played, ...h]);
-  const pool = []; for (let c = 1; c <= 104; c++) if (!seen.has(c)) pool.push(c);
+  const pool = []; for (let c = 1; c <= G.max; c++) if (!seen.has(c)) pool.push(c);
   const S = 120, cost = new Map(h.map(n => [n, 0]));
   for (let s = 0; s < S; s++){
     const opp = [];
@@ -414,17 +446,18 @@ function botAct(plan){
 function startSolo(){
   startHost('SOLO', null, true);
   for (let k = 0; k < soloN; k++) addBot(soloLv);
-  G.limit = soloT; deal(); broadcast();
+  G.limit = soloT; G.extra = soloX; deal(); broadcast();
 }
 function botBar(){
   const full = V.players.length >= 8;
   return `<div class="botbar"><span class="muted">Bot dazu:</span>${Object.entries(LEVELS).map(([k,v]) => `<button class="small-btn" data-act="addbot" data-level="${k}" ${full ? 'disabled' : ''}>${v}</button>`).join('')}</div>`;
 }
 
-// ---------- Zeitlimit: Volle Reihe ----------
+// ---------- Zeitlimit: Rindvieh ----------
 function timerKey(){
   if (G.phase === 'pick') return G.players.some((q,k) => human(k) && G.picks[k] == null) ? 'pick:' + G.round + ':' + G.trick : null;
   if (G.phase === 'resolve' && G.choose) return human(G.choose.p) ? 'row:' + G.round + ':' + G.trick + ':' + G.qi : null;
+  if (G.phase === 'resolve' && G.place) return human(G.place.p) ? 'place:' + G.round + ':' + G.trick + ':' + G.qi : null;
   return null;
 }
 function timeUp(){
@@ -434,6 +467,7 @@ function timeUp(){
     return;
   }
   if (G.phase === 'resolve' && G.choose){ log(`${G.players[G.choose.p].name}: Zeit abgelaufen.`); chooseRow(cheapestRow()); }
+  else if (G.phase === 'resolve' && G.place){ log(`${G.players[G.place.p].name}: Zeit abgelaufen.`); placeAt(G.place.k); }
 }
 
 // ---------- Zeitlimit ----------
@@ -573,10 +607,10 @@ window.addEventListener('pagehide', () => { if (role === 'client') pub('h', {typ
 // ---------- Oberfläche ----------
 const RULES = `<details><summary>Spielregeln</summary><ul>
 <li><b>Ziel:</b> möglichst wenige Minuspunkte. Hat nach einer Runde jemand ${END} oder mehr, ist Schluss; die wenigsten Minuspunkte gewinnen.</li>
-<li><b>Karten:</b> 1 bis 104. Jede kostet Minuspunkte, die unten auf der Karte stehen: meist 1, Fünfer 2, Zehner 3, Schnapszahlen 5, die 55 sogar 7. Die Farbe zeigt es auf einen Blick.</li>
+<li><b>Karten:</b> so viele wie Spieler × 10 + 4, also 1 bis 34 zu dritt, 1 bis 44 zu viert und so weiter. Vor der Runde lassen sich 10, 20 oder 30 Karten dazunehmen, höchstens bis 104. Jede kostet Minuspunkte, die unten auf der Karte stehen: meist 1, Fünfer 2, Zehner 3, Schnapszahlen 5, die 55 sogar 7. Die Farbe zeigt es auf einen Blick.</li>
 <li><b>Start:</b> Jeder bekommt 10 Karten, 4 Karten liegen offen und beginnen 4 Reihen.</li>
 <li><b>Zug:</b> Alle wählen gleichzeitig verdeckt eine Karte. Haben alle gewählt, wird aufgedeckt und von der kleinsten zur größten angelegt.</li>
-<li><b>Anlegen:</b> Jede Karte kommt an die Reihe, deren letzte Karte am nächsten darunter liegt.</li>
+<li><b>Anlegen:</b> Jede Karte kommt an die Reihe, deren letzte Karte am nächsten darunter liegt. Deine eigene Karte legst du selbst an: ziehen oder die Reihe antippen.</li>
 <li><b>Sechste Karte:</b> Wer an eine volle Reihe mit fünf Karten anlegen muss, nimmt die fünf; seine Karte beginnt die Reihe neu.</li>
 <li><b>Zu klein:</b> Ist deine Karte kleiner als alle Reihenenden, nimmst du eine Reihe deiner Wahl, und deine Karte beginnt sie neu.</li>
 <li>Nach 10 Zügen werden die genommenen Minuspunkte gezählt und über die Runden addiert.</li></ul></details>`;
@@ -584,19 +618,26 @@ const RULES = `<details><summary>Spielregeln</summary><ul>
 function cardHTML(n, o = {}){
   const p = PEN(n), cls = ['card', 'p' + p, o.size || '', o.extra || ''].join(' ');
   const attr = o.act ? `data-act="${o.act}" data-n="${n}"` : 'disabled';
-  return `<button class="${cls}" ${attr} aria-label="Karte ${n}, ${p} Minuspunkte"><span class="num">${n}</span><span class="pen">−${p}</span></button>`;
+  return `<button class="${cls}" ${attr}${o.style ? ` style="${o.style}"` : ''} aria-label="Karte ${n}, ${p} Minuspunkte"><span class="num">${n}</span><span class="pen">−${p}</span></button>`;
+}
+function extraHTML(host, val, solo, n){
+  const x = val ?? (V ? V.extra : 0), cnt = n ?? (V ? V.players.length : 2), base = MAXC(cnt, 0);
+  const txt = v => v ? `+${v}` : 'Grundzahl';
+  if (!host) return `<p class="muted" style="margin:10px 0 0">Karten 1 bis ${MAXC(cnt, x)}</p>`;
+  return `<div class="zone-label" style="margin-top:12px">Karten: 1 bis <b>${MAXC(cnt, x)}</b> <span class="muted">(${cnt} Spieler: Grundzahl ${base})</span></div>
+    <div class="chips">${EXTRAS.map(v => `<button class="chip${x === v ? ' on' : ''}" data-act="${solo ? 'solox' : 'extra'}" data-x="${v}" ${MAXC(cnt, v) === MAXC(cnt, v - 10) && v ? 'disabled' : ''}>${txt(v)}</button>`).join('')}</div>`;
 }
 function header(){
-  if (local) return `<header><b>Volle Reihe</b><span class="muted">gegen ${V.players.length - 1} Bots</span><span class="sp"></span><button class="small-btn" data-act="quit">Beenden</button></header>`;
-  return `<header><b>Volle Reihe</b><span class="muted">Raum ${esc(V.code)}</span><span class="sp"></span><button class="small-btn" data-act="share">Link teilen</button></header>`;
+  if (local) return `<header><b>Rindvieh</b><span class="muted">gegen ${V.players.length - 1} Bots</span><span class="sp"></span><button class="small-btn" data-act="quit">Beenden</button></header>`;
+  return `<header><b>Rindvieh</b><span class="muted">Raum ${esc(V.code)}</span><span class="sp"></span><button class="small-btn" data-act="share">Link teilen</button></header>`;
 }
 function render(){
   if (!V) return renderStart();
   if (V.left != null && V.until == null) V.until = Date.now() + V.left;
-  const myMove = (V.phase === 'pick' && V.mypick == null) || !!(V.choose && V.choose.p === V.me);
+  const myMove = (V.phase === 'pick' && V.mypick == null) || !!(V.choose && V.choose.p === V.me) || !!(V.place && V.place.p === V.me);
   if (myMove && lastTurn !== true){ try { navigator.vibrate && navigator.vibrate(120); } catch {} }
   lastTurn = myMove;
-  document.title = myMove ? '▶ Du bist dran – Volle Reihe' : 'Volle Reihe';
+  document.title = myMove ? '▶ Du bist dran – Rindvieh' : 'Rindvieh';
   $('#app').innerHTML = header() + (V.phase === 'lobby' ? lobbyHTML() : gameHTML(myMove));
 }
 function lobbyHTML(){
@@ -608,6 +649,7 @@ function lobbyHTML(){
   <div class="panel"><b>Am Tisch (${V.players.length}/8)</b>
     <ul class="plist">${V.players.map((p,k) => `<li>${esc(p.name)}${k === 0 ? ' <span class="muted">(Gastgeber)</span>' : ''}${k === V.me ? ' <span class="tag">du</span>' : ''}${p.bot ? ` <span class="tag">Bot · ${LEVELS[p.bot]}</span>${host ? ` <button class="small-btn" data-act="kickbot" data-idx="${k}">entfernen</button>` : ''}` : ''}</li>`).join('')}</ul>
     ${host ? botBar() : ''}
+    ${extraHTML(host)}
     ${limitHTML(host)}
     ${host ? `<button class="btn primary wide" data-act="start" ${V.players.length < 2 ? 'disabled' : ''}>Austeilen</button>${V.players.length < 2 ? '<p class="muted">Warte auf Mitspieler oder nimm einen Bot dazu.</p>' : ''}`
            : '<p class="muted">Warte, bis der Gastgeber austeilt.</p>'}
@@ -616,13 +658,14 @@ function lobbyHTML(){
 
 function gameHTML(myMove){
   const me = V.players[V.me], n = V.players.length, host = V.me === 0;
-  const myChoose = !!(V.choose && V.choose.p === V.me);
+  const myChoose = !!(V.choose && V.choose.p === V.me), myPlace = !!(V.place && V.place.p === V.me), drop = myChoose || myPlace;
 
   let opps = '';
   for (let k = 1; k < n; k++){
     const q = (V.me + k) % n, p = V.players[q];
-    const choosing = V.choose && V.choose.p === q, thinking = V.phase === 'pick' && !p.picked;
+    const choosing = (V.choose && V.choose.p === q) || (V.place && V.place.p === q), thinking = V.phase === 'pick' && !p.picked;
     const st = !p.connected ? '<span class="tag" style="color:var(--bad)">offline</span>'
+      : V.place && V.place.p === q ? '<span class="tag">legt an</span>'
       : choosing ? '<span class="tag">wählt Reihe</span>'
       : V.phase === 'pick' ? (p.picked ? '<span class="tag">gewählt</span>' : '<span class="tag" style="color:var(--muted)">überlegt</span>') : '';
     opps += `<div class="opp ${choosing || thinking ? 'turn' : ''}"><div class="nm">${esc(p.name)} ${st}</div>${p.bot ? `<div class="cnt">Bot · ${LEVELS[p.bot]}</div>` : ''}
@@ -631,7 +674,7 @@ function gameHTML(myMove){
 
   const rows = V.rows.map((r, k) => {
     const slots = Array.from({length:5}, (_, s) => r[s] != null ? cardHTML(r[s], {size:'md'}) : '<div class="slot"></div>').join('');
-    return `<div class="rowline${myChoose ? ' ok' : ''}${r.length >= 5 ? ' full' : ''}" ${myChoose ? `data-act="row" data-k="${k}" role="button" aria-label="Reihe ${k+1} nehmen"` : ''}>${slots}<span class="rp">−${rowPen(r)}</span></div>`;
+    return `<div class="rowline${drop ? ' ok' : ''}${r.length >= 5 ? ' full' : ''}" data-k="${k}" ${drop ? `data-act="${myChoose ? 'row' : 'place'}" role="button" aria-label="${myChoose ? 'Reihe ' + (k+1) + ' nehmen' : 'An Reihe ' + (k+1) + ' anlegen'}"` : ''}>${slots}<span class="rp">−${rowPen(r)}</span></div>`;
   }).join('');
   const strip = V.reveal ? `<div class="reveal">${V.reveal.map((x, k) => `<div class="it${x.done ? ' done' : k === V.qi ? ' cur' : ''}">${cardHTML(x.n, {size:'md'})}<span>${esc(V.players[x.p].name)}</span></div>`).join('')}</div>` : '';
   const center = `<div class="rows">${rows}</div>${strip}<div class="log">${V.log.map(l => `<div>${esc(l)}</div>`).join('')}</div>`;
@@ -649,7 +692,14 @@ function gameHTML(myMove){
       : `<div class="big">Gewählt: ${V.mypick}</div><div class="hint">Warte auf ${esc(wait.join(', '))}. Tippe eine andere Karte, um umzuwählen.</div>`;
     if (host && V.players.some(p => !p.connected && !p.picked)) actions += `<button class="btn" data-act="skip">Für Offline-Spieler eine Karte legen</button>`;
   } else if (V.phase === 'resolve'){
-    if (myChoose) actions = `<div class="big">Deine ${V.choose.n} ist kleiner als alle Reihen.</div><div class="hint">Tippe die Reihe, die du nimmst. Deine Karte beginnt sie neu.</div>`;
+    const dc = n => `<span class="dragcard" data-drag="${n}">${cardHTML(n)}</span>`;
+    if (myChoose) actions = `${dc(V.choose.n)}<div style="flex:1"><div class="big">Deine ${V.choose.n} ist kleiner als alle Reihen.</div><div class="hint">Zieh sie auf die Reihe, die du nimmst, oder tippe die Reihe an. Deine Karte beginnt sie neu.</div></div>`;
+    else if (myPlace) actions = `${dc(V.place.n)}<div style="flex:1"><div class="big">Leg deine ${V.place.n} an.</div><div class="hint">Zieh sie an die passende Reihe oder tippe die Reihe an. Ist die Reihe voll, nimmst du sie.</div></div>`;
+    else if (V.place){
+      const c = V.players[V.place.p];
+      actions = `<div class="hint">${esc(c.name)} legt ${V.place.n} an …</div>`;
+      if (host && !c.connected) actions += `<button class="btn" data-act="skip">Für ${esc(c.name)} anlegen</button>`;
+    }
     else if (V.choose){
       const c = V.players[V.choose.p];
       actions = `<div class="hint">${esc(c.name)} muss eine Reihe nehmen …</div>`;
@@ -662,9 +712,12 @@ function gameHTML(myMove){
     actions = `<div class="panel" style="width:100%"><div class="big">${V.final ? 'Spielende' : 'Runde ' + V.round + ' vorbei'}</div>
       <table class="res"><tr><td class="muted">Name</td><td class="muted" style="text-align:right">Runde</td><td class="muted" style="text-align:right">Gesamt</td></tr>${res}</table>
       ${V.final ? '' : `<p class="muted">Bei ${V.end} Minuspunkten ist Schluss.</p>`}
-      ${host ? `<button class="btn primary wide" data-act="start">${V.final ? 'Neues Spiel' : 'Nächste Runde'}</button>` + botBar() + limitHTML(true) : '<p class="muted">Warte auf den Gastgeber.</p>'}</div>`;
+      ${host ? `<button class="btn primary wide" data-act="start">${V.final ? 'Neues Spiel' : 'Nächste Runde'}</button>` + botBar() + extraHTML(true) + limitHTML(true) : '<p class="muted">Warte auf den Gastgeber.</p>'}</div>`;
   }
-  return `<div class="opps">${opps}</div>${center}${mine}<div class="actions">${timerHTML()}${actions}</div>${RULES}`;
+  const tk = [...(V.taken || [])].sort((a,b) => a - b), mid = (tk.length - 1) / 2, rot = Math.min(6, 40 / Math.max(1, tk.length));
+  const taken = V.phase !== 'over' ? `<div class="taken"><div class="lbl">Aufgesammelt<br><b>−${me.pen}</b></div>
+    <div class="fan">${tk.length ? tk.map((c, j) => cardHTML(c, {size:'xs', style:`transform:rotate(${((j - mid) * rot).toFixed(1)}deg)`})).join('') : '<span class="muted" style="font-size:.85rem">noch nichts</span>'}</div></div>` : '';
+  return `<div class="opps">${opps}</div>${center}${mine}<div class="actions">${timerHTML()}${actions}${taken}</div>${RULES}`;
 }
 
 function renderStart(){
@@ -672,8 +725,8 @@ function renderStart(){
   const saved = ls.get('vr-host');
   const canResume = !code && saved && saved.G && saved.G.phase !== 'lobby' && Date.now() - saved.t < 12 * 3600e3;
   const lvDesc = {hart:'spielt nach Gefühl und verschätzt sich oft.', uebel:'rechnet mit, wie riskant jede Reihe ist.', crazy:'zählt jede gespielte Karte mit.'};
-  $('#app').innerHTML = `<div class="games"><a href="./">Shithead</a><a href="kabuki.html">Kabuki</a><a class="on" href="reihe.html">Volle Reihe</a></div>
-  <div class="panel"><h1>Volle Reihe</h1><p class="muted">Für 2 bis 8 Leute, jeder am eigenen Handy. Alle legen gleichzeitig; wer die sechste Karte an eine Reihe legt, kassiert sie. Wenige Minuspunkte gewinnen. Alleine gegen Bots oder mit Freunden.</p>
+  $('#app').innerHTML = `<div class="games"><a href="./">Shithead</a><a href="kabuki.html">Kabuki</a><a class="on" href="reihe.html">Rindvieh</a></div>
+  <div class="panel"><h1>Rindvieh</h1><p class="muted">Für 2 bis 8 Leute, jeder am eigenen Handy. Alle legen gleichzeitig; wer die sechste Karte an eine Reihe legt, kassiert sie. Wenige Minuspunkte gewinnen. Alleine gegen Bots oder mit Freunden.</p>
     <label for="name">Dein Name</label><input id="name" maxlength="16" autocomplete="nickname" value="${esc(myName())}"></div>
   ${code ? `<div class="panel"><button class="btn primary wide" data-act="join" data-code="${code}">Raum ${code} beitreten</button></div>` : `
   <div class="panel"><b>Alleine gegen Bots</b>
@@ -682,6 +735,7 @@ function renderStart(){
     <div class="zone-label" style="margin-top:10px">Stärke</div>
     <div class="chips">${Object.entries(LEVELS).map(([k,v]) => `<button class="chip${soloLv === k ? ' on' : ''}" data-act="sololv" data-lv="${k}">${v}</button>`).join('')}</div>
     <p class="muted" style="font-size:.9rem;margin:8px 0 0">${LEVELS[soloLv]} ${lvDesc[soloLv]}</p>
+    ${extraHTML(true, soloX, true, soloN + 1)}
     ${limitHTML(true, soloT, true)}
     <button class="btn primary wide" data-act="solo">Spiel starten</button></div>
   <div class="panel"><b>Mit Freunden</b><p class="muted" style="margin:4px 0 0">Einer erstellt den Raum, die anderen öffnen den Link. Bots kann der Gastgeber im Raum dazunehmen.</p>
@@ -701,6 +755,9 @@ const handlers = {
   solo(){ const v = ($('#name')?.value || '').trim().slice(0,16) || 'Du'; ls.set('sh-name', v); startSolo(); },
   solon(t){ keepName(); soloN = +t.dataset.n; saveSolo(); renderStart(); },
   sololv(t){ keepName(); soloLv = t.dataset.lv; saveSolo(); renderStart(); },
+  solox(t){ keepName(); soloX = +t.dataset.x; saveSolo(); renderStart(); },
+  extra(t){ send({type:'extra', x:+t.dataset.x}); },
+  place(t){ dropOn(+t.dataset.k); },
   addbot(t){ send({type:'addbot', level:t.dataset.level}); },
   kickbot(t){ send({type:'kickbot', idx:+t.dataset.idx}); },
   quit(){ if (!confirm('Partie beenden?')) return; try { localStorage.removeItem('vr-host'); } catch {} location.href = location.pathname; },
@@ -715,14 +772,44 @@ const handlers = {
   resume(){ if (!takeName()) return; const s = ls.get('vr-host'); s.G.players[0].name = myName(); startHost(s.code, s.G, s.local); },
   async share(){
     const url = shareLink();
-    if (navigator.share){ try { await navigator.share({title:'Volle Reihe', text:`Komm an den Tisch, Raum ${roomCode}`, url}); return; } catch {} }
+    if (navigator.share){ try { await navigator.share({title:'Rindvieh', text:`Komm an den Tisch, Raum ${roomCode}`, url}); return; } catch {} }
     try { await navigator.clipboard.writeText(url); toast('Link kopiert.'); } catch { prompt('Link kopieren:', url); }
   },
   start(){ send({type:'start'}); },
   skip(){ send({type:'skip'}); },
   pick(t){ send({type:'pick', n:+t.dataset.n}); },
-  row(t){ send({type:'row', k:+t.dataset.k}); }
+  row(t){ dropOn(+t.dataset.k); }
 };
+// Eigene Karte auf eine Reihe ziehen; Antippen der Reihe geht genauso
+function dropOn(k){
+  if (!V) return;
+  if (V.choose && V.choose.p === V.me) return send({type:'row', k});
+  if (V.place && V.place.p === V.me) return send({type:'place', k});
+}
+let drag = null;
+document.addEventListener('pointerdown', e => {
+  const d = e.target.closest('[data-drag]'); if (!d) return;
+  e.preventDefault();
+  const g = d.firstElementChild.cloneNode(true); g.classList.add('ghost'); g.style.left = e.clientX + 'px'; g.style.top = e.clientY + 'px';
+  document.body.appendChild(g); drag = {g, id:e.pointerId};
+});
+const rowAt = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.closest('.rowline'); };
+document.addEventListener('pointermove', e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  drag.g.style.left = e.clientX + 'px'; drag.g.style.top = e.clientY + 'px';
+  document.querySelectorAll('.rowline.drop').forEach(r => r.classList.remove('drop'));
+  drag.g.style.display = 'none'; const r = rowAt(e.clientX, e.clientY); drag.g.style.display = '';
+  if (r) r.classList.add('drop');
+});
+function endDrag(e, ok){
+  if (!drag || e.pointerId !== drag.id) return;
+  drag.g.remove(); drag = null;
+  document.querySelectorAll('.rowline.drop').forEach(r => r.classList.remove('drop'));
+  const r = ok && rowAt(e.clientX, e.clientY);
+  if (r && r.dataset.k != null) dropOn(+r.dataset.k);
+}
+document.addEventListener('pointerup', e => endDrag(e, true));
+document.addEventListener('pointercancel', e => endDrag(e, false));
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-act]'); if (!t || t.disabled) return;
   handlers[t.dataset.act]?.(t);

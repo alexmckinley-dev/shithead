@@ -834,7 +834,7 @@ function renderStart(){
   const saved = ls.get('kb-host');
   const canResume = !code && saved && saved.G && saved.G.phase !== 'lobby' && Date.now() - saved.t < 12 * 3600e3;
   const lvDesc = {hart:'spielt solide, macht aber Fehler.', uebel:'spielt klug und merkt sich viel.', crazy:'merkt sich alles, nutzt jede Sonderkarte und reagiert blitzschnell.'};
-  $('#app').innerHTML = `<div class="games"><a href="./">Shithead</a><a class="on" href="kabuki.html">Kabuki</a><a href="reihe.html">Volle Reihe</a></div>
+  $('#app').innerHTML = `<div class="games"><a href="./">Shithead</a><a class="on" href="kabuki.html">Kabuki</a><a href="reihe.html">Rindvieh</a></div>
   <div class="panel"><h1>Kabuki</h1><p class="muted">Merkspiel für 2 bis 8 Leute, jeder am eigenen Handy. Wenige Punkte gewinnen. Alleine gegen Bots oder mit Freunden.</p>
     <label for="name">Dein Name</label><input id="name" maxlength="16" autocomplete="nickname" value="${esc(myName())}"></div>
   ${code ? `<div class="panel"><button class="btn primary wide" data-act="join" data-code="${code}">Raum ${code} beitreten</button></div>` : `
